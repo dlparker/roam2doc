@@ -1,0 +1,50 @@
+* A set of python tools for convering org-roam files to a single document
+** Can parse single or multiple org files, detecting and handling any roam links.
+** Converts parsed org data into a tree structure, which is available for output
+   in json format.
+** Converts tree structure to html, preserving a large subset of the visual structure of
+   the original files, and converting both internal and roam links into html links within
+   the converted document
+** Optionally converts the html to pdf using wkhtml2pdf.
+** Focused on the document creation aspect of org an org-roam, not on the todo lists, schedules, etc.
+* Things it doesn't do and probably should
+** Produce LaTex output, including any LaTex features found in the org files
+** Parse and do something useful with the time management aspects of org files, this
+* History, what I wanted and why it lead to this.
+** What
+  I wanted to be able to take notes on a wide range of topics and relate them together
+  into a book outline. Orgroam perfectly fit my style, so I started learning it.
+** First problem
+  I had also just started using the Grok3 AI to work on the research I was turning into notes,
+  so I wanted to be able to load all the notes into the Grok context before submitting
+  prompts. Grok informed me that orgroam files would not work as well as I wanted because
+  it wouldn't do well interpreting the org files, and especially the links. Grok suggested
+  that I would get much better results if I could collect the files into single document
+  such as a PDF. So I needed a tool to do this. I prefer to look for python based solutions
+  to such problems since I can modify or extend them if I need to, python being my favorite
+  language.
+** The First Fix
+  I found the pyorg package at [[https://travis-ci.org/nasa9084/py-org.svg?branch=master]].
+  Its main purpose was to export org content to html, and I have experience using
+  wkhtmk2pdf to create PDFs, so that seemed workable. I forked to
+  https://github.com/dlparker/pyorg2 and was able to quickly modify it to add support
+  for roam links.
+  I got Grok to help me by updating the tests from nodetest to pytest.
+  I then upgraded the tests to get 100% coverage. Seemed like a good start
+** Now I have two problems
+  As I started looking at how I wanted to use this, it became clear that I also wanted to
+  support org internal links, which the orignal package did not. The linking to something
+  part is simple, but the range of link targets that org supports lead to some complexity
+  when thinking about adding it to the package. For example, you can link to a Table and
+  almost any other element of an org file but giving it a name using a #NAME+ keyword.
+
+  Also adding complexity to the needed changes is the fact that a link/reference can
+  appear in many places other than plain text. Inside table cells, for example.
+
+  The original package's parsing had some other limitations as well, which may well have
+  been the author's intention to keep the task at hand to a useful limited subset of org
+  format. The full format is pretty rich. See https://orgmode.org/worg/org-syntax.html
+  
+  The scale of the modifications needed to achieve my goals convinced me that I was going
+  to contort the structure so badly that it would be dificult to maintain. So I decided
+  to start over.

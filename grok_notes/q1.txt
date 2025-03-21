@@ -1,0 +1,66 @@
+The text below is taken from the org mode documentation at https://orgmode.org/worg/org-syntax.html#Items
+
+I need a python regular expression method of parsing lines that match this definition.
+
+I have written a working version in python using string manipulations,
+shown below. I would like some python code that accomplishes the same thing but with regular
+expressions. My python code does not capture the optional COUNTER-SET or CHECK-BOX elements,
+but I would like to do that in the new code.
+
+-----------------
+
+                    # now figure out what parts are what
+                    tmp = line.lstrip().split()
+                    bullet = tmp.pop(0)
+                    content = None
+                    made_sense = True
+                    if len(tmp) == 0:
+                        content = ""
+                    else:
+                        while len(tmp) > 0 and made_sense:
+                            token = tmp[0]
+                            if token.startswith('[@'):
+                                # is counter
+                                discard = tmp.pop(0)
+                                continue
+                            if token in ('[ ]', '[X]', '[x]', '[+]'):
+                                # is checkbox, maybe we shouldn't skip?
+                                discard = tmp.pop(0)
+                                continue
+                            if self.list_type != 'dict':
+                                content = ' '.join(tmp)
+                                break
+                            elif len(tmp) >= 2:
+                                tag = tmp.pop(0)
+                                if tmp[0] != "::":
+                                    made_sense = False
+                                    break
+                                if len(tmp) > 0:
+                                    content = ' '.join(tmp)
+                                    break
+
+
+-------------------
+
+
+------ TEXT FROM ORG MODE DOCUMENTATION -------
+List Items are structured according to the following pattern:
+
+BULLET COUNTER-SET CHECK-BOX TAG CONTENTS
+BULLET
+One of the two forms below, followed by either a whitespace character or line ending.
+An asterisk (*), hyphen (-), or plus sign (+) character. Note that asterisk * character starting at the beginning of line and followed by whitespace cannot be an item as it would match a heading.
+Either the pattern COUNTER. or COUNTER).
+COUNTER
+Either a number or a single letter (a-z).
+COUNTER-SET (optional)
+An instance of the pattern [@COUNTER].
+CHECK-BOX (optional)
+A single whitespace character, an X character, or a hyphen enclosed by square brackets (i.e. [ ], [X], or [-]).
+TAG (optional)
+An instance of the pattern TAG-TEXT :: where TAG-TEXT is the text up until the last occurrence of the substring " :: " (two colons surrounded by whitespace, without the quotes) on that line. TAG-TEXT is then parsed with the standard set of objects.
+CONTENTS (optional)
+A collection of zero or more elements, ending at the first instance of one of the following:
+The next item.
+The first line less or equally indented than the starting line, not counting lines within other non-paragraph elements or inlinetask boundaries.
+Two consecutive blank lines.

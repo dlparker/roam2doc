@@ -1,0 +1,3 @@
+* Section {section_number}
+:PROPERTIES:
+:END:

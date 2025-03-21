@@ -1,0 +1,197 @@
+Alright, let’s craft a Python regular expression to parse Org-mode list items per the spec from orgmode.org/worg/org-syntax.html#Items. Your current string manipulation approach works but misses COUNTER-SET and CHECK-BOX capture, and regex will give us a cleaner, more precise way to grab all components—BULLET, COUNTER-SET, CHECK-BOX, TAG, and CONTENTS. I’ll align it with the Org syntax, handle your list_type context (unordered vs. definition lists), and ensure it’s extensible for your pyorg2 parser.
+Org-mode List Item Syntax Breakdown
+From the docs:
+Pattern: BULLET COUNTER-SET CHECK-BOX TAG CONTENTS
+BULLET: [-+*] or \d+[.)] (not * at line start if it’s a heading).
+COUNTER: Number or letter (e.g., 1., a)).
+COUNTER-SET: Optional [@COUNTER] (e.g., [@5], [@b]).
+CHECK-BOX: Optional [ ], [X], [x], [+] (you included [+] in your code, though docs say [-], so I’ll support both).
+TAG: Optional TAG-TEXT :: (for definition lists).
+CONTENTS: Everything else until the next item, less-indented line, or two blank lines (we’ll capture to line end for now, assuming _parse handles boundaries).
+Your code distinguishes unordered lists (list_type != 'dict') from definition lists (list_type == 'dict'), so the regex needs to adapt accordingly.
+Regex Design
+We’ll build one regex with named groups for each component, making it easy to extract parts in Python. Here’s the breakdown:
+BULLET: Match unordered ([-+*]) or ordered (\d+[.)]) bullets, with leading whitespace for indentation.
+COUNTER-SET: Optional [@\d+] or [@[a-z]].
+CHECK-BOX: Optional \s\[( |X|x|\+|-)\].
+TAG: For definition lists, .*? :: (non-greedy to stop at last ::).
+CONTENTS: Rest of the line (greedy capture).
+Python Code with Regex
+Here’s the solution integrated into your Org class context (assuming it’s for pyorg2.org):
+python
+import re
+
+class Syntax(object):
+    # Existing patterns...
+    UNORDERED_LIST = r'(?P<depth>\s*)(?P<bullet>[-+*])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
+    ORDERED_LIST = r'(?P<depth>\s*)(?P<bullet>\d+[.)])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
+    DEF_LIST = r'(?P<depth>\s*)(?P<bullet>[-+*])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<tag>.*?)(?<!\s)\s*::\s*(?P<contents>.*))?$'
+
+class Org(object):
+    regexps = {
+        # Existing regexps...
+        'unorderedlist': re.compile(Syntax.UNORDERED_LIST),
+        'orderedlist': re.compile(Syntax.ORDERED_LIST),
+        'definitionlist': re.compile(Syntax.DEF_LIST),
+    }
+
+    def _parse_list_item(self, line, list_type='unordered'):
+        """Parse a single list item line and return its components."""
+        if list_type == 'dict':
+            pattern = self.regexps['definitionlist']
+        elif list_type == 'ordered':
+            pattern = self.regexps['orderedlist']
+        else:  # unordered
+            pattern = self.regexps['unorderedlist']
+
+        match = pattern.match(line)
+        if not match:
+            return None
+
+        parts = match.groupdict()
+        return {
+            'depth': len(parts['depth']),
+            'bullet': parts['bullet'],
+            'counter_set': parts['counter_set'],  # e.g., [@5], None if absent
+            'checkbox': parts['checkbox'],        # e.g., [X], None if absent
+            'tag': parts.get('tag'),             # For def lists, None otherwise
+            'contents': parts['contents'] or ''  # Rest of line, empty if None
+        }
+
+    # Example usage in _parse (simplified)
+    def _parse(self, text):
+        text = text.splitlines()
+        for line in text:
+            # ... existing patterns ...
+            if self.regexps['orderedlist'].match(line):
+                parts = self._parse_list_item(line, list_type='ordered')
+                if parts:
+                    self._add_olist_node_from_parts(parts)
+            elif self.regexps['unorderedlist'].match(line):
+                parts = self._parse_list_item(line, list_type='unordered')
+                if parts:
+                    self._add_ulist_node_from_parts(parts)
+            elif self.regexps['definitionlist'].match(line):
+                parts = self._parse_list_item(line, list_type='dict')
+                if parts:
+                    self._add_dlist_node_from_parts(parts)
+            # ... rest of _parse ...
+
+    def _add_olist_node_from_parts(self, parts):
+        depth = parts['depth']
+        if self._is_deeper(OrderedList, depth) or not isinstance(self.current, OrderedList):
+            listnode = OrderedList(self, depth)
+            self.current.append(listnode)
+            self.current = listnode
+        while self._is_shallower(OrderedList, depth):
+            self.current = self.current.parent
+        item = ListItem(self, parts['contents'])
+        item.counter_set = parts['counter_set']
+        item.checkbox = parts['checkbox']
+        self.current.append(item)
+
+    def _add_ulist_node_from_parts(self, parts):
+        depth = parts['depth']
+        if self._is_deeper(UnOrderedList, depth) or not isinstance(self.current, UnOrderedList):
+            listnode = UnOrderedList(self, depth)
+            self.current.append(listnode)
+            self.current = listnode
+        while self._is_shallower(UnOrderedList, depth):
+            self.current = self.current.parent
+        item = ListItem(self, parts['contents'])
+        item.counter_set = parts['counter_set']
+        item.checkbox = parts['checkbox']
+        self.current.append(item)
+
+    def _add_dlist_node_from_parts(self, parts):
+        depth = parts['depth']
+        if self._is_deeper(DefinitionList, depth) or not isinstance(self.current, DefinitionList):
+            listnode = DefinitionList(self, depth)
+            self.current.append(listnode)
+            self.current = listnode
+        while self._is_shallower(DefinitionList, depth):
+            self.current = self.current.parent
+        item = DefinitionListItem(self, parts['tag'], parts['contents'])
+        item.counter_set = parts['counter_set']
+        item.checkbox = parts['checkbox']
+        self.current.append(item)
+
+    # Update ListItem to store extra attrs
+class ListItem(TerminalNode):
+    def __init__(self, org_root, value, counter_set=None, checkbox=None):
+        self.counter_set = counter_set
+        self.checkbox = checkbox
+        super().__init__(org_root, value)
+
+    def html(self, br='', lstrip=False):
+        prefix = ''
+        if self.counter_set:
+            prefix += f'{self.counter_set} '
+        if self.checkbox:
+            prefix += f'{self.checkbox} '
+        content = prefix + super().html(br, lstrip)
+        return f'<li>{content}</li>'
+Explanation
+Regex Patterns:
+Unordered: (?P<depth>\s*)(?P<bullet>[-+*])\s+... matches - item, + item, etc.
+Ordered: (?P<depth>\s*)(?P<bullet>\d+[.)])\s+... matches 1. item, 2) item.
+Definition: Adds (?P<tag>.*?)(?<!\s)\s*::\s* to capture TAG :: CONTENTS.
+Optional Groups: (?:...) with ? ensures COUNTER-SET and CHECK-BOX are optional.
+(?<!\s): Prevents tag from eating trailing spaces before ::.
+_parse_list_item:
+Takes list_type to pick the right regex.
+Returns a dict with all components, None if no match.
+Node Updates:
+ListItem stores counter_set and checkbox, prepends them in HTML.
+_add_*_node_from_parts adapts your existing logic to use the parsed dict.
+Tests
+Add to tests/test_org.py:
+python
+def test_unordered_list_item():
+    o = Org('')
+    line = "  - [@5] [X] content here"
+    parts = o._parse_list_item(line, 'unordered')
+    assert parts == {
+        'depth': 2,
+        'bullet': '-',
+        'counter_set': '[@5]',
+        'checkbox': '[X]',
+        'tag': None,
+        'contents': 'content here'
+    }
+
+def test_ordered_list_item():
+    o = Org('')
+    line = "1. [@b] [+] ordered content"
+    parts = o._parse_list_item(line, 'ordered')
+    assert parts == {
+        'depth': 0,
+        'bullet': '1.',
+        'counter_set': '[@b]',
+        'checkbox': '[+]',
+        'tag': None,
+        'contents': 'ordered content'
+    }
+
+def test_definition_list_item():
+    o = Org('')
+    line = "  + [@3] [-] tag text :: description here"
+    parts = o._parse_list_item(line, 'dict')
+    assert parts == {
+        'depth': 2,
+        'bullet': '+',
+        'counter_set': '[@3]',
+        'checkbox': '[-]',
+        'tag': 'tag text',
+        'contents': 'description here'
+    }
+
+def test_list_item_html():
+    text = "- [@2] [X] item content"
+    o = Org(text)
+    assert o.html() == '<ul><li>[@2] [X] item content</li></ul>'
+Notes
+CONTENTS Boundary: This captures to line end. Your _parse already handles multi-line content by checking indentation and blank lines—keep that logic.
+Heading Conflict: * bullets are disambiguated in _parse by checking self.regexps['heading'] first.
+Coverage: These tests hit the new regex paths; run pytest --cov to confirm.
+This regex approach matches your string manipulation’s intent but adds COUNTER-SET and CHECK-BOX capture, aligning with Org-mode’s spec. How’s it feel for your pyorg2 needs? Want to tweak the HTML output or add more test cases?

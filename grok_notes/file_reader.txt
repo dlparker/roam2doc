@@ -1,0 +1,223 @@
+Adding file parsing to your pyorg2 project is a fantastic next step—it’ll transform it from a string-based parser into a full-fledged tool for handling real Org-roam note collections, perfect for your story world-building. Supporting single files, directories, and ordered file lists, then combining them into a single HTML output with resolved Org-roam links, is ambitious but totally doable with your Python chops. Let’s break it down and sketch out the code changes to get you rolling.
+Plan Overview
+File Parsing Module: Create a new module (e.g., file_parser.py) to handle file input—single file, directory, or list of files.
+Combine into Single HTML: Parse multiple files into one Org object or concatenate their outputs, producing a unified HTML result.
+Org-roam Link Hooks: Add logic to resolve [[id:uuid][title]] links into internal HTML anchors (e.g., <a href="#uuid">title</a>) that point to the right spots in the combined document.
+Step 1: File Parsing Module
+Let’s create pyorg2/file_parser.py to handle the file input variants. It’ll use pathlib for clean file handling and integrate with your existing Org class.
+python
+# pyorg2/file_parser.py
+from pathlib import Path
+from .org import Org, org_to_html
+
+class OrgFileParser:
+    """Parser for Org-mode files."""
+    def __init__(self, default_heading=1):
+        self.default_heading = default_heading
+        self.nodes = []  # Store parsed Org objects or raw text per file
+
+    def parse_file(self, file_path):
+        """Parse a single Org-mode file."""
+        file_path = Path(file_path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"{file_path} is not a valid file")
+        with file_path.open('r', encoding='utf-8') as f:
+            text = f.read()
+        org = Org(text, self.default_heading)
+        self.nodes.append(org)
+        return org
+
+    def parse_directory(self, directory_path):
+        """Parse all .org files in a directory."""
+        directory = Path(directory_path)
+        if not directory.is_dir():
+            raise NotADirectoryError(f"{directory} is not a valid directory")
+        org_files = sorted(directory.glob('*.org'))  # Alphabetical order
+        for file_path in org_files:
+            self.parse_file(file_path)
+        return self.nodes
+
+    def parse_file_list(self, file_paths):
+        """Parse a list of Org-mode files in specified order."""
+        for file_path in file_paths:
+            self.parse_file(file_path)
+        return self.nodes
+
+    def to_html(self, newline=''):
+        """Combine all parsed nodes into a single HTML output."""
+        if not self.nodes:
+            return ''
+        return newline.join(node.html(newline) for node in self.nodes)
+
+def parse_org_file(file_path, default_heading=1, newline=''):
+    """Convenience function for single file parsing."""
+    parser = OrgFileParser(default_heading)
+    parser.parse_file(file_path)
+    return parser.to_html(newline)
+
+def parse_org_directory(directory_path, default_heading=1, newline=''):
+    """Convenience function for directory parsing."""
+    parser = OrgFileParser(default_heading)
+    parser.parse_directory(directory_path)
+    return parser.to_html(newline)
+
+def parse_org_files(file_paths, default_heading=1, newline=''):
+    """Convenience function for list of files parsing."""
+    parser = OrgFileParser(default_heading)
+    parser.parse_file_list(file_paths)
+    return parser.to_html(newline)
+Class Approach: OrgFileParser tracks parsed Org objects in self.nodes, letting you build up a collection.
+Single File: parse_file reads one .org file and stores its Org node.
+Directory: parse_directory grabs all .org files, sorts them (for consistency), and parses each.
+File List: parse_file_list respects your order, parsing each file in sequence.
+HTML Output: to_html concatenates all nodes’ HTML with a customizable newline separator.
+Convenience Functions: Mirror org_to_html for easy single-use cases.
+Step 2: Combine into Single HTML
+The to_html method already merges the parsed files’ HTML outputs. For a single logical document (e.g., one <html> with all content), you could wrap it:
+python
+def to_html(self, newline='', wrap=True):
+    """Combine all parsed nodes into a single HTML output."""
+    if not self.nodes:
+        return ''
+    content = newline.join(node.html(newline) for node in self.nodes)
+    if wrap:
+        return f'<html><body>{content}</body></html>'
+    return content
+This keeps your options open—wrapped for a standalone page or raw for embedding elsewhere (e.g., NiceGUI).
+Step 3: Org-roam Link Hooks
+Your OrgRoamLink class already outputs <a href="#uuid">title</a>, but we need to:
+Track IDs: Map each note’s ID (from #+ID: or filename-derived) to its content.
+Resolve Links: Ensure #uuid points to the right spot in the combined HTML.
+Modify Org to Track IDs
+Add ID tracking to Org:
+python
+# pyorg2/org.py
+class Org(object):
+    def __init__(self, text, default_heading=1, file_id=None):
+        self.text = text
+        self.children = []
+        self.parent = self
+        self.current = self
+        self.bquote_flg = False
+        self.src_flg = False
+        self.default_heading = default_heading
+        self.file_id = file_id  # Optional ID from file metadata
+        self.id_map = {}  # Map IDs to nodes
+        self._parse(self.text)
+
+    def _parse(self, text):
+        text = text.splitlines()
+        for line in text:
+            # Check for #+ID: property
+            if line.startswith('#+ID:'):
+                self.file_id = line.split('#+ID:')[1].strip()
+            # Existing parsing logic...
+            elif self.regexps['heading'].match(line):
+                m = self.regexps['heading'].match(line)
+                heading = Heading(
+                    depth=len(m.group('level')),
+                    title=m.group('title'),
+                    default_depth=self.default_heading)
+                self._add_heading_node(heading)
+                # Optionally assign ID to heading if present in properties
+            # ... rest of _parse ...
+
+    def html(self, br='', id_map=None):
+        if id_map is not None:
+            self.id_map.update(id_map)  # Merge external ID map
+        return br.join(child.html(br, id_map=self.id_map) for child in self.children)
+ID Tracking: file_id stores a note’s ID (from #+ID: or filename). id_map tracks all IDs to nodes or positions.
+Pass ID Map: html method accepts an id_map to share across files.
+Update Heading for IDs
+Headings often get IDs in Org-roam; let’s tag them:
+python
+class Heading(Node):
+    def __init__(self, depth, title, default_depth=1, heading_id=None):
+        self.depth = depth + (default_depth - 1)
+        self.title = title
+        self.heading_id = heading_id  # Optional ID from properties
+        super().__init__()
+        self.type_ = 'Heading{}'.format(self.depth)
+
+    def html(self, br='', id_map=None):
+        if id_map is not None and self.heading_id:
+            id_map[self.heading_id] = self  # Register ID
+        attrs = f' id="{self.heading_id}"' if self.heading_id else ''
+        heading = f'<h{self.depth}{attrs}>{self.title}</h{self.depth}>'
+        content = ''.join(child.html(br, id_map) for child in self.children)
+        return heading + content
+Update OrgRoamLink
+Pass the id_map to resolve links:
+python
+class OrgRoamLink(TerminalNode):
+    def html(self, br='', id_map=None):
+        if id_map and self.roam_id in id_map:
+            # Link to known ID
+            return f'<a href="#{self.roam_id}">{self.values[0]}</a>'
+        # Fallback if ID not found
+        return f'<a href="#{self.roam_id}" class="unresolved">{self.values[0]}</a>'
+Tie It Together in OrgFileParser
+python
+class OrgFileParser:
+    def __init__(self, default_heading=1):
+        self.default_heading = default_heading
+        self.nodes = []
+        self.id_map = {}  # Global ID map across files
+
+    def parse_file(self, file_path):
+        file_path = Path(file_path)
+        if not file_path.is_file():
+            raise FileNotFoundError(f"{file_path} is not a valid file")
+        with file_path.open('r', encoding='utf-8') as f:
+            text = f.read()
+        # Use filename as fallback ID if no #+ID:
+        file_id = file_path.stem if '#+ID:' not in text else None
+        org = Org(text, self.default_heading, file_id=file_id)
+        self.nodes.append(org)
+        self.id_map.update(org.id_map)  # Collect IDs
+        return org
+
+    def to_html(self, newline='', wrap=True):
+        if not self.nodes:
+            return ''
+        content = newline.join(node.html(newline, id_map=self.id_map) for node in self.nodes)
+        if wrap:
+            return f'<html><body>{content}</body></html>'
+        return content
+Example Usage
+python
+# Single file
+parser = OrgFileParser()
+parser.parse_file('notes/trade.org')
+html = parser.to_html(newline='\n')
+
+# Directory
+parser = OrgFileParser()
+parser.parse_directory('notes/')
+html = parser.to_html(newline='\n')
+
+# File list
+files = ['notes/agriculture.org', 'notes/trade.org']
+parser = OrgFileParser()
+parser.parse_file_list(files)
+html = parser.to_html(newline='\n')
+Sample Org Files
+agriculture.org:
+#+ID: ag123
+* Agriculture
+Farming info linked to [[id:trade456][Trade Networks]].
+trade.org:
+#+ID: trade456
+* Trade Networks
+Details on shipping.
+Output HTML:
+html
+<html><body>
+<h1 id="ag123">Agriculture</h1><p>Farming info linked to <a href="#trade456">Trade Networks</a>.</p>
+<h1 id="trade456">Trade Networks</h1><p>Details on shipping.</p>
+</body></html>
+Next Steps
+Tests: Add pytest cases for file parsing and link resolution (e.g., test_org_roam_link_resolution).
+ID Sources: Parse Org properties (:PROPERTIES: blocks) for IDs beyond #+ID:.
+NiceGUI: Hook this into your web app, mapping #uuid to routes if needed.
+This gets you file parsing and link resolution in one HTML blob. Push it to your repo and let me know how it runs—or if you want to refine the ID logic further! What’s your first test file going to be?
