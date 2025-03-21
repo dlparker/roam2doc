@@ -1,20 +1,20 @@
 * A set of python tools for convering org-roam files to a single document
-** Can parse single or multiple org files, detecting and handling any roam links.
-** Converts parsed org data into a tree structure, which is available for output
+- Can parse single or multiple org files, detecting and handling any roam links.
+- Converts parsed org data into a tree structure, which is available for output
    in json format.
-** Converts tree structure to html, preserving a large subset of the visual structure of
+- Converts tree structure to html, preserving a large subset of the visual structure of
    the original files, and converting both internal and roam links into html links within
    the converted document
-** Optionally converts the html to pdf using wkhtml2pdf.
-** Focused on the document creation aspect of org an org-roam, not on the todo lists, schedules, etc.
-* Things it doesn't do and probably should
-** Produce LaTex output, including any LaTex features found in the org files
-** Parse and do something useful with the time management aspects of org files, this
-* History, what I wanted and why it lead to this.
-** What
+- Optionally converts the html to pdf using wkhtml2pdf.
+- Focused on the document creation aspect of org an org-roam, not on the todo lists, schedules, etc.
+** Things it doesn't do and probably should
+- Produce LaTex output, including any LaTex features found in the org files
+- Parse and do something useful with the time management aspects of org files, this
+** History, what I wanted and why it lead to this.
+- What
   I wanted to be able to take notes on a wide range of topics and relate them together
   into a book outline. Orgroam perfectly fit my style, so I started learning it.
-** First problem
+- First problem
   I had also just started using the Grok3 AI to work on the research I was turning into notes,
   so I wanted to be able to load all the notes into the Grok context before submitting
   prompts. Grok informed me that orgroam files would not work as well as I wanted because
@@ -23,7 +23,7 @@
   such as a PDF. So I needed a tool to do this. I prefer to look for python based solutions
   to such problems since I can modify or extend them if I need to, python being my favorite
   language.
-** The First Fix
+- The First Fix
   I found the pyorg package at [[https://travis-ci.org/nasa9084/py-org.svg?branch=master]].
   Its main purpose was to export org content to html, and I have experience using
   wkhtmk2pdf to create PDFs, so that seemed workable. I forked to
@@ -31,7 +31,7 @@
   for roam links.
   I got Grok to help me by updating the tests from nodetest to pytest.
   I then upgraded the tests to get 100% coverage. Seemed like a good start
-** Now I have two problems
+- Now I have two problems
   As I started looking at how I wanted to use this, it became clear that I also wanted to
   support org internal links, which the orignal package did not. The linking to something
   part is simple, but the range of link targets that org supports lead to some complexity
