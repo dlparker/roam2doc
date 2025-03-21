@@ -1,5 +1,6 @@
 import re
 import logging
+import typing
 from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
@@ -190,7 +191,19 @@ class ParseTool:
         while p is not None and not isinstance(p, SectionParse):
             p.self.doc_parser.get_parser_parent(p)
         return p
-        
+
+class ParagraphParse(ParseTool):
+
+    def __init__(self, doc_parser, start, end):
+        self.start = start
+        self.end = end
+        self.cursor = start
+        super().__init__(doc_parser)
+
+    def parse(self):
+        # tell the caller where in
+        pass
+    
 
 class SectionParse(ParseTool):
 
@@ -302,90 +315,6 @@ class ListParse(ParseTool):
             'orderedlist': re.compile(ORDERED_LIST_regex),
             'deflist': re.compile(DEF_LIST_regex), # definitionlist, but shorter name
         }
-
-
-    def old_parse(self):
-        matcher = MatchList()
-        heading_matcher = MatchHeading()
-        table_matcher = MatchTable()
-        sec_p = self.get_section_parser()
-        start_pos = sec_p.cursor
-        end = sec_p.end
-        short_id = f"List@{start_pos}"
-        blank_count = 0
-        spaces_per_level = 0
-        while start_pos < end:
-            for line in self.doc_parser.lines[start_pos:end]:
-                # look for end conditions
-                if (heading_matcher.match_line(line) 
-                    or table_matcher.match_line(line)):
-                    return
-                if matcher.match_line(line):
-                    res = self.old_list_line_get_type(line)
-                    if self.list_type != res['list_type']:
-                        raise Exception('nested other type lists not done yet')
-                    ordinal = res['ordinal']
-                    if self.list_type != "def":
-                        # calculate level
-                        indent = len(line) - len(line.lstrip())
-                        if indent == self.margin:
-                            level = 1
-                        elif spaces_per_level == 0:
-                            # this must be the first indent
-                            spaces_per_level = indent - self.margin
-                            level = 2
-                        else:
-                            level = int(indent / spaces_per_level) + 1
-                    # now figure out what parts are what
-                    tmp = line.lstrip().split()
-                    bullet = tmp.pop(0)
-                    content = None
-                    made_sense = True
-                    if len(tmp) == 0:
-                        content = ""
-                    else:
-                        while len(tmp) > 0 and made_sense:
-                            token = tmp[0]
-                            if token.startswith('[@'):
-                                # is counter
-                                discard = tmp.pop(0)
-                                continue
-                            if token in ('[ ]', '[X]', '[x]', '[+]'):
-                                # is checkbox, maybe we shouldn't skip?
-                                discard = tmp.pop(0)
-                                continue
-                            if self.list_type != "def":
-                                content = ' '.join(tmp)
-                                break
-                            elif len(tmp) >= 2:
-                                tag = tmp.pop(0)
-                                if tmp[0] != "::":
-                                    made_sense = False
-                                    break
-                                if len(tmp) > 0:
-                                    content = ' '.join(tmp)
-                                    break
-                        if not made_sense:
-                            self.logger.warning("could not parse list line %s", line)
-                        elif self.list_type == "ordered":
-                            content_list = [Text(the_list, content),]
-                            item = OrderedListItem(the_list, level, ordinal, content_list)
-                        elif self.list_type == "unordered":
-                            content_list = [Text(the_list, content),]
-                            item = UnorderedListItem(the_list, level, content_list)
-                        else:
-                            raise Exception('no code for dict lists yet')
-                    self.logger.debug(self.match_log_format, short_id, str(matcher), line)
-                    sec_p.cursor += 1
-                else:
-                    if len(line) == 0:
-                        sec_p.cursor += 1
-                        blank_count += 1
-                        BlankLine(self.the_list.children[-1])
-                        if blank_count == 2:
-                            return
-                        continue
-                    return
 
 
     def parse(self):
@@ -530,7 +459,10 @@ class ListParse(ParseTool):
     
         
 class LineRegexMatch:
-
+    """ The structure of this class and its children might look a bit funny,
+    but i am  trying to ensure that the re patterns are compiled just once,
+    not every time a class is instantiated"""
+    
     def __init__(self, patterns):
         self.patterns = patterns
 
@@ -538,7 +470,9 @@ class LineRegexMatch:
         for re in self.patterns:
             sr = re.match(line)
             if sr:
-                return dict(start=sr.start(), end=sr.end(), matched=sr)
+                return dict(start=sr.start(), end=sr.end(),
+                            groupdict=sr.groupdict(),
+                            matched=sr)
         return False
 
     def get_parse_tool(self, doc_parser, name=None):
@@ -582,3 +516,106 @@ class MatchList(LineRegexMatch):
 
     def get_parse_tool(self, doc_parser, name=None):
         return ListParse(doc_parser, name)
+
+class LineRegexAndEndMatch(LineRegexMatch):
+
+    def __init__(self, patterns, end_pattern):
+        super().__init__(self.patterns)
+        self.end_pattern = end_pattern
+        
+    def match_end_line(self, line):
+        sr = self.end_pattern.match(line)
+        if sr:
+            return dict(start=sr.start(), end=sr.end(),
+                        groupdict=sr.groupdict(),
+                        matched=sr)
+        return False
+    
+class MatchSrc(LineRegexAndEndMatch):
+    patterns = [re.compile('^\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
+    end_pattern = re.compile('^\#\+END_SRC', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+    
+class MatchQuote(LineRegexAndEndMatch):
+    patterns = [re.compile('^\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
+    end_pattern = re.compile('^\#\+END_QUOTE', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+class MatchCenter(LineRegexAndEndMatch):
+    patterns = [re.compile('^\#\+BEGIN_CENTER', re.IGNORECASE),]
+    end_pattern = re.compile('^\#\+END_CENTER', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+    
+class MatchExample(LineRegexAndEndMatch):
+    patterns = [re.compile('^\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
+    end_pattern = re.compile('^\#\+END_EXAMPLE', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+class Detector:
+    heading_matcher = MatchHeading()
+    table_matcher = MatchTable()
+    list_matcher = MatchList()
+    quote_matcher = MatchQuote()
+    center_matcher = MatchCenter()
+    # end of greater
+    src_matcher = MatchSrc()
+
+    def detect_greater_element(self, lines, start, end):
+        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
+        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
+        pos = start
+        for line in lines[start:end]:
+            # greater elements
+            for match_type, matcher in dict(heading=self.heading_matcher,
+                                            table=self.table_matcher,
+                                            list=self.list_matcher,
+                                            quote=self.quote_matcher,
+                                            center=self.center_matcher).items():
+                match_res = matcher.match_line(line)
+                if match_res:
+                    #parser = matcher.get_parse_tool()
+                    matched = match_res['matched']
+                    res = dict(match_type=match_type, pos=pos,
+                               string=matched.string,
+                               start=match_res['start'],
+                               end=match_res['end'],
+                               group_dict=matched.groupdict())
+                    return res
+            # lesser elements
+            pos += 1
+        return None
+
+    def detect_object(self, lines, start, end):
+        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
+        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
+        pos = start
+        for line in lines[start:end]:
+            if heading_matcher.match_line(line):
+                return dict(matched='heading', pos=pos)
+            if table_matcher.match_line(line):
+                return dict(matched='table', pos=pos)
+            if list_matcher.match_line(line):
+                return dict(matched='list', pos=pos)
+            pos += 1
+        return None
+
+    
+if __name__=="__main__":
+    lines = []
+    lines.append('#+Begin_Center')
+    lines.append('Stuff in the middle')
+    lines.append('More Stuff in the middle')
+    lines.append('#+END_CenTer')
+    detector = Detector()
+    elem  = detector.detect_greater_element(lines, 0, len(lines))
+    print(elem)
+    

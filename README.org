@@ -10,6 +10,9 @@
 ** Things it doesn't do and probably should
 - Produce LaTex output, including any LaTex features found in the org files
 - Parse and do something useful with the time management aspects of org files, this
+** Things it doesn't do and maybe never will
+- Inlinetasks are not parsed, they will be treated as headings an will make things ugly
+- Footnotes are not parsed, they will be treated as ordinary text
 ** History, what I wanted and why it lead to this.
 *** What
   I wanted to be able to take notes on a wide range of topics and relate them together
@@ -48,3 +51,13 @@
   The scale of the modifications needed to achieve my goals convinced me that I was going
   to contort the structure so badly that it would be dificult to maintain. So I decided
   to start over.
+
+
+#+begin_quote
+Stuff here
+#+end_quote
+
+#+begin_src python
+  def foo(s):
+      pass
+#+end_src
