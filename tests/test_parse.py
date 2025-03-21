@@ -165,3 +165,20 @@ def test_file_all_nodes():
     #obj_tree = json.dumps(parser.root, default=lambda o:o.to_json_dict(), indent=4)
     #print(obj_tree)
     print(parser.root.to_html())
+
+
+def test_foo():
+    from roam2doc.parse import DocParser, SectionParse, Detector
+    lines = []
+    lines.append('* Foo')
+    lines.append('#+BEGIN_CENTER')
+    lines.append('Stuff in the middle')
+    lines.append('More Stuff in the middle')
+    lines.append('#+END_CenTer')
+    buff = '\n'.join(lines)
+    doc_parser = DocParser(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
+    
+    
+    

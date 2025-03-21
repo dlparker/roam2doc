@@ -192,17 +192,6 @@ class ParseTool:
             p.self.doc_parser.get_parser_parent(p)
         return p
 
-class ParagraphParse(ParseTool):
-
-    def __init__(self, doc_parser, start, end):
-        self.start = start
-        self.end = end
-        self.cursor = start
-        super().__init__(doc_parser)
-
-    def parse(self):
-        # tell the caller where in
-        pass
     
 
 class SectionParse(ParseTool):
@@ -250,6 +239,15 @@ class SectionParse(ParseTool):
         start_pos = self.cursor
         while start_pos < self.end:
             for line in self.doc_parser.lines[start_pos:self.end]:
+                if line.upper().startswith('#+BEGIN'):
+                    detector = Detector(self.doc_parser)
+                    elem  = detector.detect_greater_element(self.doc_parser.lines, start_pos, self.end)
+                    print(elem)
+                    parser = elem['parser']
+                    self.doc_parser.push_parser(parser)
+                    print(parser.parse())
+                    self.doc_parser.pop_parser(parser)
+                    
                 # check for simple line start matches first
                 matched = False
                 for matcher in line_matchers:
@@ -532,33 +530,52 @@ class LineRegexAndEndMatch(LineRegexMatch):
         return False
     
 class MatchSrc(LineRegexAndEndMatch):
-    patterns = [re.compile('^\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
-    end_pattern = re.compile('^\#\+END_SRC', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_SRC', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
     
 class MatchQuote(LineRegexAndEndMatch):
-    patterns = [re.compile('^\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
-    end_pattern = re.compile('^\#\+END_QUOTE', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_QUOTE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
+    def get_parse_tool(self, doc_parser, name=None):
+        return ParagraphParse(doc_parser, name)
+        
 class MatchCenter(LineRegexAndEndMatch):
-    patterns = [re.compile('^\#\+BEGIN_CENTER', re.IGNORECASE),]
-    end_pattern = re.compile('^\#\+END_CENTER', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_CENTER', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_CENTER', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
     
+    def get_parse_tool(self, doc_parser, name=None):
+        return ParagraphParse(doc_parser, name)
+    
 class MatchExample(LineRegexAndEndMatch):
-    patterns = [re.compile('^\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
-    end_pattern = re.compile('^\#\+END_EXAMPLE', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_EXAMPLE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
+
+class ParagraphParse(ParseTool):
+
+    def __init__(self, doc_parser, name):
+        super().__init__(doc_parser, name)
+
+    def parse(self):
+        sec_p = self.get_section_parser()
+        self.start = sec_p.cursor
+        self.end = sec_p.end
+        para = Paragraph(sec_p.tree_node)
+        Text(para, ' '.join(self.doc_parser.lines[self.start+1:self.end]))
+        
 
 class Detector:
     heading_matcher = MatchHeading()
@@ -569,6 +586,9 @@ class Detector:
     # end of greater
     src_matcher = MatchSrc()
 
+    def __init__(self, doc_parser):
+        self.doc_parser = doc_parser
+        
     def detect_greater_element(self, lines, start, end):
         """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
         things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
@@ -582,9 +602,10 @@ class Detector:
                                             center=self.center_matcher).items():
                 match_res = matcher.match_line(line)
                 if match_res:
-                    #parser = matcher.get_parse_tool()
+                    parser = matcher.get_parse_tool(self.doc_parser)
                     matched = match_res['matched']
                     res = dict(match_type=match_type, pos=pos,
+                               parser=parser,
                                string=matched.string,
                                start=match_res['start'],
                                end=match_res['end'],
@@ -608,14 +629,4 @@ class Detector:
             pos += 1
         return None
 
-    
-if __name__=="__main__":
-    lines = []
-    lines.append('#+Begin_Center')
-    lines.append('Stuff in the middle')
-    lines.append('More Stuff in the middle')
-    lines.append('#+END_CenTer')
-    detector = Detector()
-    elem  = detector.detect_greater_element(lines, 0, len(lines))
-    print(elem)
     
