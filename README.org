@@ -24,7 +24,7 @@
   to such problems since I can modify or extend them if I need to, python being my favorite
   language.
 - The First Fix
-  I found the pyorg package at [[https://travis-ci.org/nasa9084/py-org.svg?branch=master]].
+  I found the pyorg package at https://github.com/nasa9084/py-org.
   Its main purpose was to export org content to html, and I have experience using
   wkhtmk2pdf to create PDFs, so that seemed workable. I forked to
   https://github.com/dlparker/pyorg2 and was able to quickly modify it to add support
