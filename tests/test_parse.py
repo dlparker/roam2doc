@@ -171,17 +171,63 @@ def test_matchers():
     do_list_matcher_test()
 
 
-def test_foo():
+def find_para_blocks(lines, start, end):
+    # caller has stripped the data down to text that does not trigger any element matches.
+    # also guarantees that the first line is not blank
+    pos = start
+    paras = []
+    cur_para = dict(start=pos, end=-1, first_blank=-1, last_blank=-1)
+    paras.append(cur_para)
+    while pos < end:
+        if lines[pos].strip() == '':
+            if cur_para['first_blank'] == -1:
+                cur_para['first_blank'] = pos
+            cur_para['last_blank'] = pos
+        else:
+            if cur_para['first_blank'] != -1:
+                cur_para['end'] = pos - 1
+                cur_para = dict(start=pos, end=-1, first_blank=-1, last_blank=-1)
+                paras.append(cur_para)
+        pos += 1
+    cur_para['end'] = pos - 1
+    return paras
+
+def test_no_elems():
     lines = []
-    lines.append('* Foo')
-    lines.append('#+BEGIN_CENTER')
-    lines.append('Stuff in the middle')
-    lines.append('More Stuff in the middle')
-    lines.append('#+END_CenTer')
+    lines.append('* Section 1 heading')
+    lines.append('')
+    lines.append('')
+    lines.append('This will be a paragraph.')
+    lines.append('This continues the paragraph.')
+    lines.append('The next line (blank) will end the paragraph.')
+    lines.append('')
+    lines.append('This will be a second paragraph. ')
+    lines.append('The following blank lines will end it.')
+    lines.append('The following next two blank will also be part of the paragraph.')
+    lines.append('They should be part of the section directly')
+    lines.append('')
+    lines.append('')
+    lines.append('')
+    lines.append('This will be a second paragraph. ')
+    lines.append('* Section 2 heading')
+    lines.append('** Section 3 heading')
+    lines.append('* Section 4 heading')
+
     buff = '\n'.join(lines)
-    doc_parser = DocParser(buff, "inline")
+
+    logger = logging.getLogger("test_code")
+    logger.info("starting test_no_elems")
+    doc_parser = DocParserWrap(buff, "inline")
     doc_parser.parse()
+    #doc_parser.find_top_sections()
+    #assert len(doc_parser.sections) == 3
+    
+    section_p = doc_parser.sections[0]
+    res = find_para_blocks(lines, 3, len(lines) - 1)
+    pprint(res)
+
     print(doc_parser.root.to_html())
+    
     
     
     

@@ -71,7 +71,7 @@ class DocParser:
     def record_parse_problem(self, problem_dict):
         self.parse_problems.append(problem_dict)
     
-    def find_section(self, offset=0, include_blank_start=False):
+    def find_first_section(self, offset=0, include_blank_start=False):
         """ Section parsing it done by finding the start and the end before parsing. This allows the section
         parser to be the parent of all other parsers, simplifying the logic in most of those."""
         lines = self.lines[offset:]
@@ -103,8 +103,8 @@ class DocParser:
         subs = lines[pos:]
         for line in subs:
             if MatchHeading().match_line(line):
-                    end_pos = pos - 1
-                    break
+                end_pos = pos - 1
+                break
             pos += 1
         return SectionParse(self, start_pos + offset, end_pos + offset)
 
@@ -127,32 +127,53 @@ class DocParser:
             start_offset += 1
             self.logger.info("Found file title, setting offset to %s", start_offset)
             self.logger.debug("File title = %s", pformat(title))
-        section = self.find_section(start_offset, include_blank_start=True)
-        self.logger.info("found section 0 starting lines %d to %d of %d",
-                    section.start,
-                    section.end,
-                    len(self.lines))
+        section = self.find_first_section(start_offset, include_blank_start=True)
         return section
 
-    def find_sections(self):
+    def find_top_sections(self):
         """ This method is broken out from the parse method to make it easier to build
         child classes for test, so that the test version can poke at the steps of the process """
-        section = self.parse_file_start()
-        start_offset = section.end
-        self.sections.append(section)
-        while section.end < len(self.lines) - 1:
-            section = self.find_section(section.end + 1)
-            if section is None:
+        first_section = self.parse_file_start()
+        start_offset = first_section.end
+        self.sections.append(first_section)
+        self.logger.info("found level 1 section %d lines %d to %s of %d",
+                         0, 
+                         first_section.start + 1,
+                         first_section.end + 1,
+                         len(self.lines))
+        tool_box = ToolBox()
+        pos = start_offset + 1
+        starts = []
+        while pos < len(self.lines):
+            elem  = tool_box.next_greater_element(self, pos, len(self.lines))
+            if elem is None:
                 break
-            self.logger.info("found section %d starting lines %d to %d of %d",
+            pos = elem['match_line']
+            pos += 1
+            if elem['match_type'] != MatcherType.heading:
+                continue
+            stars =  elem['group_dict']['stars']
+            level = len(stars)
+            if level > 1:
+                continue
+            starts.append(elem['match_line'])
+        index = 0
+        for start in starts:
+            if index == len(starts) - 1:
+                end = len(self.lines) - 1
+            else:
+                end = starts[index+1] -1
+            index += 1
+            section = SectionParse(self, start, end)
+            self.logger.info("found level 1 section %d lines %d to %s of %d",
                         len(self.sections),
-                        section.start,
-                        section.end,
+                        section.start + 1,
+                        section.end + 1,
                         len(self.lines))
             self.sections.append(section)
         
     def parse(self):
-        self.find_sections()
+        self.find_top_sections()
         for section in self.sections:
             self.current_section = section
             self.push_parser(section)
@@ -230,10 +251,11 @@ class SectionParse(ParseTool):
         if first_line.startswith('*'):
             last_star = first_line.lstrip().rfind('*') 
             self.level = last_star + 1
-            self.heading_text = first_line[self.level:]
+            self.heading_text = first_line[last_star + 1:].strip()
             if self.end == self.start:
                 return True
             self.cursor += 1
+            return True
         # We don't have an actual heading, just start of file.
         # We need to figure out some kind of text for a heading, cause
         # that is how we roll.
@@ -246,7 +268,7 @@ class SectionParse(ParseTool):
         self.level = 1
         return False
 
-    def parse(self):
+    def old_parse(self):
         found_heading = self.calc_level()
         if found_heading:
             self.cursor = self.start + 1
@@ -288,6 +310,47 @@ class SectionParse(ParseTool):
                     # this needs to add content to current paragraph, creating as needed
             start_pos = self.cursor
                     
+    def parse(self):
+        found_heading = self.calc_level()
+        if found_heading:
+            self.cursor = self.start + 1
+        self.tree_node = Section(self.doc_parser.branch, self.heading_text)
+        if self.end == self.start:
+            return
+        self.properties = self.doc_parser.parse_properties(self.cursor, self.end)
+        short_id = f"Section@{self.start}"
+        if self.properties:
+            self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
+            self.cursor += len(self.properties) + 2
+        line_matchers = [MatchTable(), MatchList()]
+        tool_box = ToolBox()
+        # now find all greater elements
+        g_elements = []
+        pos = self.cursor
+        last_sub = pos
+        while pos < self.end:
+            for line in self.doc_parser.lines[pos:self.end]:
+                elem  = tool_box.next_greater_element(self.doc_parser, pos, self.end)
+                if elem:
+                    parse_tool = elem['parse_tool']
+                    self.doc_parser.push_parser(parse_tool)
+                    match_pos = elem['start']
+                    if match_pos > last_sub:
+                        print(f'text between {last_sub} and {match_pos} has no greaters in it')
+                    last_sub = match_pos
+                    parse_tool(match_pos, self.end)
+                    self.doc_parser.pop_parser(parse_tool)
+                    # it should have updated our cursor
+                    pos = self.cursor
+                    rec = dict(elem=elem, start=match_pos, end=pos - 1)
+                    g_elements.append(rec)
+                    print(rec)
+                else:
+                    pos = self.end
+                    break
+            
+                
+        
 
     def __str__(self):
         msg = f"Level {self.level} "
@@ -520,13 +583,13 @@ class LineRegexMatch:
         return self.__class__.__name__
 
 class MatchHeading(LineRegexMatch):
-    patterns = [re.compile(r'^\*.*[\s].*(?P<heading>\w+.)?$'),]
+    patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
 
     def __init__(self):
         super().__init__(self.patterns)
 
     def get_parse_tool(self, doc_parser, name=None):
-        raise Exception("Headings start sections, and section parsers need more info to start, see find_sections method of DocParser")
+        raise Exception("Headings start sections, and section parsers need more info to start, see find_top_sections method of DocParser")
 
 class MatchDoubleBlank(LineRegexMatch):
     patterns = [re.compile(r"^[ \t].*$"),]
@@ -732,18 +795,19 @@ class ToolBox:
                         # while we might want to look for one, we don't process them like
                         # everything else, we run through the list created by the top
                         # level parse.
-                        parser = None
+                        parse_tool = None
                     else:
-                        parser = matcher.get_parse_tool(doc_parser)
+                        parser_tool = matcher.get_parse_tool(doc_parser)
                     matched = match_res['matched']
                     res = dict(match_type=match_type, pos=pos,
-                               parser=parser,
+                               parse_tool=parse_tool,
                                string=matched.string,
-                               start=match_res['start'],
-                               end=match_res['end'],
+                               match_line=pos,
+                               start_char=match_res['start'],
+                               end_char=match_res['end'],
                                group_dict=matched.groupdict())
                     return res
-            # lesser elements
-            pos += 1
+                # lesser elements
+                pos += 1
         return None
 

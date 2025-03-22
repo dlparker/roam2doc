@@ -1,1 +1,1 @@
-1. Need to make enums for list types, and for matchers, prolly build a global structure (class?) that lets you look up a matcher by enum
+10. Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
