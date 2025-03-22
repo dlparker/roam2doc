@@ -1,66 +1,13 @@
 import sys
-print(sys.path)
 import logging
 import json
-from logging.config import dictConfig
 from pathlib import Path
 from pprint import pprint, pformat
 import pytest
-from roam2doc.parse import DocParser
-
-def setup_logging(default_level="error"):
-    lfstring = '[%(levelname)s] %(name)s: %(message)s'
-    log_formaters = dict(standard=dict(format=lfstring))
-    logfile_path = Path('.', "test.log")
-    if False:
-        file_handler = dict(level="DEBUG",
-                            formatter="standard",
-                            encoding='utf-8',
-                            mode='w',
-                            filename=str(logfile_path))
-        file_handler['class'] = "logging.FileHandler"
-    stdout_handler =  dict(level="DEBUG",
-                           formatter="standard",
-                           stream="ext://sys.stdout")
-    # can't us "class" in above form
-    stdout_handler['class'] = "logging.StreamHandler"
-    log_handlers = dict(stdout=stdout_handler)
-    handler_names = ['stdout']
-    if False:
-        log_handlers = dict(file=file_handler, stdout=stdout_handler)
-        handler_names = ['file', 'stdout']
-    log_loggers = set_levels(handler_names, default_level=default_level)
-    log_config = dict(version=1, disable_existing_loggers=False,
-                      formatters=log_formaters,
-                      handlers=log_handlers,
-                      loggers=log_loggers)
-        # apply the caller's modifications to the level specs
-    try:
-        dictConfig(log_config)
-    except:
-        from pprint import pprint
-        pprint(log_config)
-        raise
-    return log_config
-
-def set_levels(handler_names, default_level='error'):
-    log_loggers = dict()
-    err_log = dict(handlers=handler_names, level="ERROR", propagate=False)
-    warn_log = dict(handlers=handler_names, level="WARNING", propagate=False)
-    root_log = dict(handlers=handler_names, level="ERROR", propagate=False)
-    info_log = dict(handlers=handler_names, level="INFO", propagate=False)
-    debug_log = dict(handlers=handler_names, level="DEBUG", propagate=False)
-    log_loggers[''] = root_log
-    default_log = err_log
-    if default_level == "warn":
-        default_log =  warn_log
-    elif default_level == "info":
-        default_log =  info_log
-    elif default_level == "debug":
-        default_log =  debug_log
-    log_loggers['pyorg2-parser'] = default_log
-    log_loggers['test_code'] = default_log
-    return log_loggers
+from roam2doc.parse import (DocParser, MatchHeading, MatchDoubleBlank, MatchTable, MatchList,
+                            MatchSrc, MatchQuote, MatchCenter, MatchExample, MatchGreaterEnd,
+                            ParagraphParse, MatcherType, ToolBox)
+from setup_logging import setup_logging
 
 setup_logging(default_level="debug")
 
@@ -165,6 +112,63 @@ def test_file_all_nodes():
     #obj_tree = json.dumps(parser.root, default=lambda o:o.to_json_dict(), indent=4)
     #print(obj_tree)
     print(parser.root.to_html())
+
+class DocParserWrap(DocParser):
+
+    pass
+
+def do_list_matcher_test():
+    """ Ensure that the matchers for the start and end of a list work"""
+    lines = []
+    lines.append('* Foo')
+    lines.append('+ l1')
+    # terminate the list with double blank line
+    lines.append('')
+    lines.append('')
+    doc_parser, section_p = matcher_test_setup(lines)
+    list_matcher = MatchList()
+    double_matcher = MatchDoubleBlank()
+    m1 = list_matcher.match_line(lines[section_p.cursor])
+    assert m1 is not None
+    m2 = double_matcher.match_line(lines[section_p.cursor + 1])
+    assert m2 is not None
+    end_matcher = MatchDoubleBlank()
+    end  = end_matcher.match_line_range(lines, section_p.cursor + 2, len(lines))
+    assert end is not None
+
+    lines = []
+    lines.append('* Foo')
+    lines.append('+ l1')
+    # terminate the list with a new section
+    lines.append('* bar')
+    doc_parser, section_p = matcher_test_setup(lines)
+    end_matcher = MatchGreaterEnd()
+    end  = end_matcher.match_line_range(doc_parser, lines, section_p.cursor + 2, len(lines))
+    assert end is not None
+    assert ToolBox.get_matcher(MatcherType.alist) is not None
+    
+def matcher_test_setup(lines):
+    buff = '\n'.join(lines)
+    doc_parser = DocParserWrap(buff, "inline")
+    doc_parser.find_sections()
+    assert len(doc_parser.sections) == 1
+    section_p = doc_parser.sections[0]
+    pos = 0
+
+    heading_matcher = MatchHeading()
+    hmatch = heading_matcher.match_line(lines[pos])
+    assert hmatch is not None, "Heading matcher failed, direct position"
+    hmatch = heading_matcher.match_line(lines[section_p.cursor])
+    assert hmatch is not None, "Heading matcher failed, position from section cursor"
+    with pytest.raises(Exception):
+        section_parse_tool = heading_matcher.get_parse_tool(doc_parser)
+    # pretend to start the section parser, but don't do it
+    doc_parser.current_section = section_p
+    doc_parser.push_parser(section_p)
+    return doc_parser, section_p
+    
+def test_matchers():
+    do_list_matcher_test()
 
 
 def test_foo():

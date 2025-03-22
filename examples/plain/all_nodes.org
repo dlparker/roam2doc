@@ -3,7 +3,7 @@
 *** Heading Level 3
 **** Heading Level 4
 ***** Heading Level 5
-****** Heading Level 6
+****** [#B] Heading Level 6
 
 [[http://example.com][Link Title]]
 [[https://example.com][Link Title]]
@@ -73,3 +73,34 @@ Stuff here
   def foo(s):
       pass
 #+end_src
+
+
+
+1. List before para
+2. Item 2
+   in para
+
+   
+1. List before heading
+2. Item 2
+* Heading after list
+** Sub
+
+
+
+1. List before greater block
+2. Item2
+#+begin_quote
+akd
+#+end_quote
+
+
+1. List before lesser block
+2. Item2
+#+begin_src
+akd
+#+end_src
+
+
+  
+  

@@ -1,6 +1,7 @@
 import re
 import logging
 import typing
+from enum import Enum
 from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
@@ -10,6 +11,8 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
                          Table, TableRow, TableCell, Link, Image, InternalLink)
+
+
 
 class DocParser:
 
@@ -25,10 +28,11 @@ class DocParser:
         self.root = root
         self.doc_properties = None
         self.doc_title = None
-        self.parser_stack = []
         self.current_section = None
+        self.sections = []
         self.match_log_format =    "%15s %12s matched line %s"
         self.no_match_log_format = "%15s %12s matched line %s"
+        self.parser_stack = []
         self.parse_problems = []
         self.heading_matcher = MatchHeading()
         self.table_matcher = MatchTable()
@@ -36,6 +40,7 @@ class DocParser:
         self.quote_matcher = MatchQuote()
         self.center_matcher = MatchCenter()
         self.src_matcher = MatchSrc()
+        self.logger = logging.getLogger('roam2doc-parser')
         
     def get_parse_range(self):
         if self.current_section is None:
@@ -65,9 +70,10 @@ class DocParser:
 
     def record_parse_problem(self, problem_dict):
         self.parse_problems.append(problem_dict)
-        
+    
     def find_section(self, offset=0, include_blank_start=False):
-        # look for a non blank line
+        """ Section parsing it done by finding the start and the end before parsing. This allows the section
+        parser to be the parent of all other parsers, simplifying the logic in most of those."""
         lines = self.lines[offset:]
         pos = -1
         start_pos = -1
@@ -91,67 +97,74 @@ class DocParser:
         # the first line which may or may not be a heading
         end_pos = len(lines)  - 1
         pos += 1
-        if pos < end_pos + 1:
-            # single line file is possible
-            subs = lines[pos:]
-            for line in subs:
-                if MatchHeading().match_line(line):
+        if pos >= end_pos + 1:
+            return None
+        # single line file is possible
+        subs = lines[pos:]
+        for line in subs:
+            if MatchHeading().match_line(line):
                     end_pos = pos - 1
                     break
-                pos += 1
+            pos += 1
         return SectionParse(self, start_pos + offset, end_pos + offset)
 
-    def parse(self):
-        logger = logging.getLogger('roam2doc-parser')
-        sections = []
-        result = dict(sections=sections)
-        # it is possible that the file starts with a properties block
-        lines = self.lines
+    def parse_file_start(self):
+        """ This method is broken out from the parse method to make it easier to build
+        child classes for test, so that the test version can poke at the steps of the process """
         start_offset = 0
-        properties = self.parse_properties(0, len(lines))
+        properties = self.parse_properties(start_offset, len(self.lines))
         if properties:
             # need to skip some lines before searching for section
-            result['file_properties'] = properties
             self.doc_properties = properties
             # props wrapped in :PROPERTIES:\nprops\n:END:
             start_offset += len(properties) + 2
-            logger.info("Found file level properies, setting offset to %s", start_offset)
-            logger.debug("File level properies = %s", pformat(properties))
+            self.logger.info("Found file level properies, setting offset to %s", start_offset)
+            self.logger.debug("File level properies = %s", pformat(properties))
         # might have a #+title: next
-        if lines[start_offset].startswith("#+title:"):
-            title = ":".join(lines[start_offset].split(":")[1:])
-            result['title'] = title
+        if self.lines[start_offset].startswith("#+title:"):
+            title = ":".join(self.lines[start_offset].split(":")[1:])
             self.doc_title = title
             start_offset += 1
-            logger.info("Found file title, setting offset to %s", start_offset)
-            logger.debug("File title = %s", pformat(title))
+            self.logger.info("Found file title, setting offset to %s", start_offset)
+            self.logger.debug("File title = %s", pformat(title))
         section = self.find_section(start_offset, include_blank_start=True)
-        logger.info("found section 0 starting lines %d to %d of %d",
+        self.logger.info("found section 0 starting lines %d to %d of %d",
                     section.start,
                     section.end,
-                    len(lines))
-        sections.append(section)
-        while section.end < len(lines) - 1:
+                    len(self.lines))
+        return section
+
+    def find_sections(self):
+        """ This method is broken out from the parse method to make it easier to build
+        child classes for test, so that the test version can poke at the steps of the process """
+        section = self.parse_file_start()
+        start_offset = section.end
+        self.sections.append(section)
+        while section.end < len(self.lines) - 1:
             section = self.find_section(section.end + 1)
-            logger.info("found section %d starting lines %d to %d of %d",
-                        len(sections),
+            if section is None:
+                break
+            self.logger.info("found section %d starting lines %d to %d of %d",
+                        len(self.sections),
                         section.start,
                         section.end,
-                        len(lines))
-            sections.append(section)
-
-        for section in sections:
+                        len(self.lines))
+            self.sections.append(section)
+        
+    def parse(self):
+        self.find_sections()
+        for section in self.sections:
             self.current_section = section
             self.push_parser(section)
             section.parse()
             self.pop_parser(section)
+        result = dict(sections=self.sections, title=self.doc_title, properties=self.doc_properties)
         return result
 
     def parse_properties(self, start, end):
         # :PROPERTIES:
         #  some number of property defs all starting with :
         # :END:
-        logger = logging.getLogger('roam2doc-parser')
         start_line = self.lines[start].lstrip()
         if start_line.startswith(':PROPERTIES'):
             prop_lines = [start_line,]
@@ -163,7 +176,7 @@ class DocParser:
                 prop_lines.append(tmp)
                 offset += 1
             if prop_lines[-1].lower() == ":end:":
-                logger.debug("processing properties in lines %d to %s", start, end)
+                self.logger.debug("processing properties in lines %d to %s", start, end)
                 # first and last are start and end, only middle ones matter
                 prop_dict = {}
                 for prop_line in prop_lines[1:-1]:
@@ -171,51 +184,12 @@ class DocParser:
                     name = tmp[1]
                     value = ":".join(tmp[2:])
                     prop_dict[name] = value
-                logger.debug("parsed properties %s", pformat(prop_dict))
+                self.logger.debug("parsed properties %s", pformat(prop_dict))
                 return prop_dict
             else:
-                logger.warning("failed to parse properties starting on line %d", offset)
+                self.logger.warning("failed to parse properties starting on line %d", offset)
         return None
 
-    def next_greater_element(self, lines, start, end):
-        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
-        things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
-        pos = start
-        for line in lines[start:end]:
-            # greater elements
-            for match_type, matcher in dict(heading=self.heading_matcher,
-                                            table=self.table_matcher,
-                                            list=self.list_matcher,
-                                            quote=self.quote_matcher,
-                                            center=self.center_matcher).items():
-                match_res = matcher.match_line(line)
-                if match_res:
-                    parser = matcher.get_parse_tool(self)
-                    matched = match_res['matched']
-                    res = dict(match_type=match_type, pos=pos,
-                               parser=parser,
-                               string=matched.string,
-                               start=match_res['start'],
-                               end=match_res['end'],
-                               group_dict=matched.groupdict())
-                    return res
-            # lesser elements
-            pos += 1
-        return None
-
-    def detect_object(self, lines, start, end):
-        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
-        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
-        pos = start
-        for line in lines[start:end]:
-            if heading_matcher.match_line(line):
-                return dict(matched='heading', pos=pos)
-            if table_matcher.match_line(line):
-                return dict(matched='table', pos=pos)
-            if list_matcher.match_line(line):
-                return dict(matched='list', pos=pos)
-            pos += 1
-        return None
 
 class ParseTool:
 
@@ -259,6 +233,7 @@ class SectionParse(ParseTool):
             self.heading_text = first_line[self.level:]
             if self.end == self.start:
                 return True
+            self.cursor += 1
         # We don't have an actual heading, just start of file.
         # We need to figure out some kind of text for a heading, cause
         # that is how we roll.
@@ -283,10 +258,11 @@ class SectionParse(ParseTool):
             self.cursor += len(self.properties) + 2
         line_matchers = [MatchTable(), MatchList()]
         start_pos = self.cursor
+        tool_box = ToolBox()
         while start_pos < self.end:
             for line in self.doc_parser.lines[start_pos:self.end]:
                 if line.upper().startswith('#+BEGIN'):
-                    elem  = self.doc_parser.next_greater_element(self.doc_parser.lines, start_pos, self.end)
+                    elem  = tool_box.next_greater_element(self.doc_parser, start_pos, self.end)
                     print(elem)
                     parser = elem['parser']
                     self.doc_parser.push_parser(parser)
@@ -354,9 +330,9 @@ class ListParse(ParseTool):
 
         self.regexps = {
             # Existing regexps...
-            'unorderedlist': re.compile(UNORDERED_LIST_regex),
-            'orderedlist': re.compile(ORDERED_LIST_regex),
-            'deflist': re.compile(DEF_LIST_regex), # definitionlist, but shorter name
+            ListType.unordered_list: re.compile(UNORDERED_LIST_regex),
+            ListType.ordered_list: re.compile(ORDERED_LIST_regex),
+            ListType.def_list: re.compile(DEF_LIST_regex), # definitionlist, but shorter name
         }
 
 
@@ -377,23 +353,22 @@ class ListParse(ParseTool):
             problem = dict(description="List parser called with first line that is not a list item",
                            problem_line_pos=pos, problem_line=line)
             self.doc_parser.record_parse_problem(problem)
-            breakpoint()
             return
         # This will be the margin for all list items, so the
         # depth calculation needs to subtract this first
         margin = match_res['lindent']
         list_type = match_res['list_type']
         level = 1
-        if list_type == 'ordered':
+        if list_type == ListType.ordered_list:
             the_list = OrderedList(parent=parent_parser.tree_node, margin=margin)
             content_list = [Text(the_list, match_res['contents']),]
             ordinal = match_res['bullet'].rstrip(".").rstrip(')')
             item = OrderedListItem(the_list, level, ordinal, content_list)
-        elif list_type == 'unordered':
+        elif list_type == ListType.unordered_list:
             the_list = UnorderedList(parent=parent_parser.tree_node, margin=margin)
             content_list = [Text(the_list, match_res['contents']),]
             item = UnorderedListItem(the_list, level, content_list)
-        elif list_type == 'def':
+        elif list_type == ListType.def_list:
             the_list = DictionaryList(parent=parent_parser.tree_node, margin=margin)
             title = DictionaryListItemTitle(the_list, match_res['tag'])
             content_list = [Text(the_list, match_res['contents']),]
@@ -403,7 +378,6 @@ class ListParse(ParseTool):
             desc = "List parser code is buggy, detected a list type but has no code for it"
             problem = dict(description=desc, problem_line_pos=pos, problem_line=line)
             self.doc_parser.record_parse_problem(problem)
-            breakpoint()
             return
         self.logger.debug(self.match_log_format, short_id, str(matcher), line)
         self.logger.debug("%15s %12s created item %s", short_id, '', item)
@@ -447,14 +421,14 @@ class ListParse(ParseTool):
                 if match_res['list_type'] != list_type:
                     raise Exception('not yet dealing with other list type as content of list item')
                 self.logger.debug(self.match_log_format, short_id, str(matcher), line)
-                if list_type == 'ordered':
+                if list_type == ListType.ordered_list:
                     content_list = [Text(the_list, match_res['contents']),]
                     ordinal = match_res['bullet'].rstrip(".").rstrip(')')
                     item = OrderedListItem(the_list, level, ordinal, content_list)
-                elif list_type == 'unordered':
+                elif list_type == ListType.unordered_list:
                     content_list = [Text(the_list, match_res['contents']),]
                     item = UnorderedListItem(the_list, level, content_list)
-                elif list_type == 'def':
+                elif list_type == ListType.def_list:
                     title = DictionaryListItemTitle(the_list, match_res['tag'])
                     content_list = [Text(the_list, match_res['contents']),]
                     desc = DictionaryListItemDescription(the_list, content_list)
@@ -468,7 +442,7 @@ class ListParse(ParseTool):
                 
     def list_line_get_type(self, line):
         sec_p = self.get_section_parser()
-        for bullettype in ['ordered', 'unordered', 'def']:
+        for bullettype in [ListType.ordered_list, ListType.unordered_list, ListType.def_list]:
             match_res = self.parse_list_item(line, bullettype)
             if match_res:
                 return match_res
@@ -477,14 +451,14 @@ class ListParse(ParseTool):
     def append_lines_to_item(self, item, lines):
         raise Exception('not yet dealing with list item content paragraphs')
 
-    def parse_list_item(self, line, list_type='unordered'):
+    def parse_list_item(self, line, list_type):
         """Parse a single list item line and return its components."""
         if list_type == "def":
-            pattern = self.regexps['deflist']
-        elif list_type == 'ordered':
-            pattern = self.regexps['orderedlist']
+            pattern = self.regexps[ListType.def_list]
+        elif list_type == ListType.ordered_list:
+            pattern = self.regexps[ListType.ordered_list]
         else:  # unordered
-            pattern = self.regexps['unorderedlist']
+            pattern = self.regexps[ListType.unordered_list]
         match = pattern.match(line)
         if not match:
             return None
@@ -501,6 +475,19 @@ class ListParse(ParseTool):
         }
     
         
+class ParagraphParse(ParseTool):
+
+    def __init__(self, doc_parser, name):
+        super().__init__(doc_parser, name)
+
+    def parse(self):
+        sec_p = self.get_section_parser()
+        self.start = sec_p.cursor
+        self.end = sec_p.end
+        para = Paragraph(sec_p.tree_node)
+        Text(para, ' '.join(self.doc_parser.lines[self.start+1:self.end]))
+        
+
 class LineRegexMatch:
     """ The structure of this class and its children might look a bit funny,
     but i am  trying to ensure that the re patterns are compiled just once,
@@ -518,6 +505,14 @@ class LineRegexMatch:
                             matched=sr)
         return False
 
+    def match_line_range(self, lines, start, end):
+        matches = []
+        for line in lines[start, end+1]:
+            m = self.match_line(line)
+            if m:
+                matches.append(m)
+        return matches
+    
     def get_parse_tool(self, doc_parser, name=None):
         raise NotImplementedError
     
@@ -525,11 +520,30 @@ class LineRegexMatch:
         return self.__class__.__name__
 
 class MatchHeading(LineRegexMatch):
-    patterns = [re.compile(r"^\*.*[ \t].*[\s].*$"),]
+    patterns = [re.compile(r'^\*.*[\s].*(?P<heading>\w+.)?$'),]
 
     def __init__(self):
         super().__init__(self.patterns)
 
+    def get_parse_tool(self, doc_parser, name=None):
+        raise Exception("Headings start sections, and section parsers need more info to start, see find_sections method of DocParser")
+
+class MatchDoubleBlank(LineRegexMatch):
+    patterns = [re.compile(r"^[ \t].*$"),]
+
+    def __init__(self):
+        super().__init__(self.patterns)
+
+    def match_line_range(self, lines, start, end):
+        first = -2
+        pos = start
+        for line in lines[start:end+1]:
+            m = self.match_line(line)
+            if first == pos - 1:
+                return dict(start=first, end=pos)
+            first = pos
+            pos += 1
+        return None
     
 class MatchTable(LineRegexMatch):
     patterns = [re.compile(r"^\|[ \t]*"),
@@ -541,24 +555,58 @@ class MatchTable(LineRegexMatch):
     def get_parse_tool(self, doc_parser, name=None):
         return TableParse(doc_parser, name)
         
+
 class MatchList(LineRegexMatch):
-    patterns = [
-        # - followed by whitespace
-        re.compile(r"[ ]*\-[ \t].*"),
-        # + followed by whitespace
-        re.compile(r"[ ]*\+[ \t].*"),
-        # * not at first char, followed by whitespace
-        re.compile(r"^[ ].*\*[ \t]*"),
-        # number followed by dot, followed by whitespace
-        re.compile(r"^[ ]*\d+\.[ \t].*"),
-        # number followed by close paren, followed by whitespace
-        re.compile(r"[ ]*\d+\)[ \t].*"),
+
+    UNORDERED_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>[-+*])'\
+        r'\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*'\
+        r'(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
+    ORDERED_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>\d+[.)])'\
+        r'\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*'\
+        r'(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
+    DEF_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>[-+*])'\
+        r'\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*'\
+        r'(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<tag>.*?)'\
+        r'(?<!\s)\s*::\s*(?P<contents>.*))?$'
+
+    unordered_re = re.compile(UNORDERED_LIST_regex)
+    ordered_re =  re.compile(ORDERED_LIST_regex)
+    def_re =  re.compile(DEF_LIST_regex)
+    all_patterns = [
+        unordered_re,
+        ordered_re,
+        def_re,
         ]
     def __init__(self):
-        super().__init__(self.patterns)
+        super().__init__(self.all_patterns)
 
+    def match_line(self, line, require_type=None, ignore_type=None):
+        if require_type is None and ignore_type is None:
+            return super().match_line(line)
+        # Instead of the usual initize time list of patterns,
+        # we manipulated it for each pattern and call the super,
+        # that way we know which pattern matched. Most (all?)
+        # other children of regex match don't care.
+        if require_type:
+            if require_type == ListType.ordered_list:
+                self.patterns = [ordered_re,]
+            if require_type == ListType.unordered_list:
+                self.patterns = [unordered_re,]
+            if require_type == ListType.def_list:
+                self.patterns = [def_re,]
+        else:
+            self.patterns = list(self.all_patterns)
+            if ignore_type == ListType.ordered_list:
+                self.patterns.remove(ordered_re)
+            if ignore_type == ListType.unordered_list:
+                self.patterns.remove(unordered_re)
+            if ignore_type == ListType.def_list:
+                self.patterns.remove(def_re)
+        return super.match_line(line)
+        
     def get_parse_tool(self, doc_parser, name=None):
         return ListParse(doc_parser, name)
+
 
 class LineRegexAndEndMatch(LineRegexMatch):
 
@@ -609,18 +657,93 @@ class MatchExample(LineRegexAndEndMatch):
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
-class ParagraphParse(ParseTool):
-
-    def __init__(self, doc_parser, name):
-        super().__init__(doc_parser, name)
-
-    def parse(self):
-        sec_p = self.get_section_parser()
-        self.start = sec_p.cursor
-        self.end = sec_p.end
-        para = Paragraph(sec_p.tree_node)
-        Text(para, ' '.join(self.doc_parser.lines[self.start+1:self.end]))
-        
-
-
+class MatchGreaterEnd:
     
+    def match_line_range(self, doc_parser, lines, start, end):
+        pos = start
+        tool_box = ToolBox()
+        next_elem = tool_box.next_greater_element(doc_parser, pos, end)
+        return next_elem
+
+
+class ListType(str, Enum):
+
+    ordered_list = "ORDERED_LIST"
+    unordered_list = "UNORDERED_LIST"
+    def_list = "DEF_LIST"
+    
+    def __str__(self):
+        return self.value
+    
+class MatcherType(str, Enum):
+
+    heading = "HEADING"
+    table = "TABLE"
+    alist = "LIST"
+    quote_block = "QUOTE_BLOCK"
+    center_block = "CENTER_BLOCK"
+    # end of greater elements
+    # special cases
+    greater_end = "GREATER_END"
+    # lesser elements
+    example_block = "EXAMPLE_BLOCK"
+
+    # special cases
+    double_blank_line = "DOUBLE_BLANK_LINE"
+
+    def __str__(self):
+        return self.value
+    
+class ToolBox:
+    greater_matchers = {MatcherType.heading: MatchHeading(),
+                        MatcherType.table:MatchTable(),
+                        MatcherType.alist:MatchList(),
+                        MatcherType.quote_block:MatchQuote(),
+                        MatcherType.center_block:MatchCenter(),
+                        }
+    
+    greater_end_matchers = {MatcherType.greater_end: MatchGreaterEnd(),
+                            }
+    # lesser elements
+    lesser_matchers = {MatcherType.example_block:MatchExample(),
+                        }
+    @classmethod
+    def get_matcher_dict(cls):
+        res = dict(cls.greater_matchers)
+        res.update(cls.greater_end_matchers)
+        res.update(cls.lesser_matchers)
+        return res
+
+    @classmethod
+    def get_matcher(cls, typename):
+        d = cls.get_matcher_dict()
+        return d.get(typename, None)
+
+    def next_greater_element(cls, doc_parser, start, end):
+        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
+        things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
+        pos = start
+        for line in doc_parser.lines[start:end]:
+            # greater elements
+            for match_type, matcher in cls.greater_matchers.items():
+                match_res = matcher.match_line(line)
+                if match_res:
+                    if match_type == MatcherType.heading:
+                        # while we might want to look for one, we don't process them like
+                        # everything else, we run through the list created by the top
+                        # level parse.
+                        parser = None
+                    else:
+                        parser = matcher.get_parse_tool(doc_parser)
+                    matched = match_res['matched']
+                    res = dict(match_type=match_type, pos=pos,
+                               parser=parser,
+                               string=matched.string,
+                               start=match_res['start'],
+                               end=match_res['end'],
+                               group_dict=matched.groupdict())
+                    return res
+            # lesser elements
+            pos += 1
+        return None
+

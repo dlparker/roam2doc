@@ -8,7 +8,7 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
                          Table, TableRow, TableCell, Link, Image, InternalLink)
-from roam2doc.dev_utils import build_tree_1
+from construct_tree import build_tree_1
 
 
     

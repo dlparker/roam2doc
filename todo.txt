@@ -1,0 +1,1 @@
+1. Need to make enums for list types, and for matchers, prolly build a global structure (class?) that lets you look up a matcher by enum
