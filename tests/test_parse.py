@@ -224,7 +224,7 @@ def test_no_elems():
     
     section_p = doc_parser.sections[0]
     res = find_para_blocks(lines, 3, len(lines) - 1)
-    pprint(res)
+    #pprint(res)
 
     print(doc_parser.root.to_html())
     

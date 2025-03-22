@@ -174,11 +174,18 @@ class DocParser:
         
     def parse(self):
         self.find_top_sections()
+        index = 0
         for section in self.sections:
             self.current_section = section
+            self.logger.info("running parser for level 1 section %d lines %d to %s of %d",
+                             index,
+                             section.start + 1,
+                             section.end + 1,
+                             len(self.lines))
             self.push_parser(section)
             section.parse()
             self.pop_parser(section)
+            index += 1
         result = dict(sections=self.sections, title=self.doc_title, properties=self.doc_properties)
         return result
 
@@ -316,6 +323,7 @@ class SectionParse(ParseTool):
             self.cursor = self.start + 1
         self.tree_node = Section(self.doc_parser.branch, self.heading_text)
         if self.end == self.start:
+            self.logger.debug("Header %s has no following section contents", str(self))
             return
         self.properties = self.doc_parser.parse_properties(self.cursor, self.end)
         short_id = f"Section@{self.start}"
@@ -329,28 +337,33 @@ class SectionParse(ParseTool):
         pos = self.cursor
         last_sub = pos
         while pos < self.end:
-            for line in self.doc_parser.lines[pos:self.end]:
-                elem  = tool_box.next_greater_element(self.doc_parser, pos, self.end)
-                if elem:
-                    parse_tool = elem['parse_tool']
-                    self.doc_parser.push_parser(parse_tool)
-                    match_pos = elem['start']
-                    if match_pos > last_sub:
-                        print(f'text between {last_sub} and {match_pos} has no greaters in it')
-                    last_sub = match_pos
-                    parse_tool(match_pos, self.end)
-                    self.doc_parser.pop_parser(parse_tool)
-                    # it should have updated our cursor
-                    pos = self.cursor
-                    rec = dict(elem=elem, start=match_pos, end=pos - 1)
-                    g_elements.append(rec)
-                    print(rec)
-                else:
-                    pos = self.end
-                    break
-            
-                
-        
+            elem  = tool_box.next_greater_element(self.doc_parser, pos, self.end)
+            if elem:
+                self.logger.debug('%s found inner element %s', str(self), str(elem))
+                parse_tool = elem['parse_tool']
+                self.doc_parser.push_parser(parse_tool)
+                match_pos = elem['start']
+                if match_pos > last_sub:
+                    print(f'text between {last_sub} and {match_pos} has no greaters in it')
+                last_sub = match_pos
+                parse_tool(match_pos, self.end)
+                self.doc_parser.pop_parser(parse_tool)
+                # it should have updated our cursor
+                pos = self.cursor
+                rec = dict(elem=elem, start=match_pos, end=pos - 1)
+                g_elements.append(rec)
+                print(rec)
+            else:
+                pos = self.end
+                break
+        if g_elements:
+            pass
+        else:
+            para = ParagraphParse(self.doc_parser, None)
+            self.doc_parser.push_parser(para)
+            para.set_bounds(self.cursor, self.end)
+            para.parse()
+            self.doc_parser.pop_parser(para)
 
     def __str__(self):
         msg = f"Level {self.level} "
@@ -542,13 +555,29 @@ class ParagraphParse(ParseTool):
 
     def __init__(self, doc_parser, name):
         super().__init__(doc_parser, name)
+        self.start = -1
+        self.end = -1
+        self.logger = logging.getLogger('roam2doc-parser')
 
+    def set_bounds(self, start, end):
+        self.start = start
+        self.end = end
+        
     def parse(self):
         sec_p = self.get_section_parser()
-        self.start = sec_p.cursor
-        self.end = sec_p.end
         para = Paragraph(sec_p.tree_node)
-        Text(para, ' '.join(self.doc_parser.lines[self.start+1:self.end]))
+        last_was_blank = False
+        self.logger.debug('Adding paragraph to section %s', sec_p)
+        for line in self.doc_parser.lines[self.start:self.end + 1]:
+            if line.strip() == "":
+                BlankLine(para)
+                last_was_blank = True
+            else:
+                if last_was_blank:
+                    self.logger.debug('Adding paragraph to section %s', sec_p)
+                    para = Paragraph(sec_p.tree_node)
+                last_was_blank = False
+                Text(para, line)
         
 
 class LineRegexMatch:
@@ -786,11 +815,13 @@ class ToolBox:
         """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
         things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
         pos = start
-        for line in doc_parser.lines[start:end]:
+        logger = logging.getLogger('roam2doc-parser')
+        for line in doc_parser.lines[start:end+1]:
             # greater elements
             for match_type, matcher in cls.greater_matchers.items():
                 match_res = matcher.match_line(line)
                 if match_res:
+                    logger.debug("matched %s at line %d", match_type, pos)
                     if match_type == MatcherType.heading:
                         # while we might want to look for one, we don't process them like
                         # everything else, we run through the list created by the top
