@@ -101,6 +101,25 @@ akd
 akd
 #+end_src
 
+1. List before code
+2. Item 2
+   #+begin_src python
+     def foo():
+         bar
+   #+end_src 
+
+
+
+
+     #+begin_src python
+       def python():
+           pass
+     #+end_src 
+
+
+   
+   
+
 
   
   

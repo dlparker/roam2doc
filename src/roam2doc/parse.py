@@ -546,8 +546,8 @@ class MatchDoubleBlank(LineRegexMatch):
         return None
     
 class MatchTable(LineRegexMatch):
-    patterns = [re.compile(r"^\|[ \t]*"),
-                re.compile(r"^\+-.*")]
+    patterns = [re.compile(r"^[ \t]*\|[ \t]*"),
+                re.compile(r"^[ \t]*\+-.*")]
 
     def __init__(self):
         super().__init__(self.patterns)
@@ -623,16 +623,16 @@ class LineRegexAndEndMatch(LineRegexMatch):
         return False
     
 class MatchSrc(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
-    end_pattern = re.compile(r'^\#\+END_SRC', re.IGNORECASE)
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_SRC', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
     
 class MatchQuote(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
-    end_pattern = re.compile(r'^\#\+END_QUOTE', re.IGNORECASE)
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_QUOTE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -641,8 +641,8 @@ class MatchQuote(LineRegexAndEndMatch):
         return ParagraphParse(doc_parser, name)
         
 class MatchCenter(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^\#\+BEGIN_CENTER', re.IGNORECASE),]
-    end_pattern = re.compile(r'^\#\+END_CENTER', re.IGNORECASE)
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_CENTER', re.IGNORECASE),]
+    end_pattern = re.compile(r'[ \t]*^\#\+END_CENTER', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -651,8 +651,8 @@ class MatchCenter(LineRegexAndEndMatch):
         return ParagraphParse(doc_parser, name)
     
 class MatchExample(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
-    end_pattern = re.compile(r'^\#\+END_EXAMPLE', re.IGNORECASE)
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_EXAMPLE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
