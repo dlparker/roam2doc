@@ -51,13 +51,3 @@
   The scale of the modifications needed to achieve my goals convinced me that I was going
   to contort the structure so badly that it would be dificult to maintain. So I decided
   to start over.
-
-
-#+begin_quote
-Stuff here
-#+end_quote
-
-#+begin_src python
-  def foo(s):
-      pass
-#+end_src
