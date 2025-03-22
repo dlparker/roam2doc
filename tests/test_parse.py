@@ -168,7 +168,6 @@ def test_file_all_nodes():
 
 
 def test_foo():
-    from roam2doc.parse import DocParser, SectionParse, Detector
     lines = []
     lines.append('* Foo')
     lines.append('#+BEGIN_CENTER')

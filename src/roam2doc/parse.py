@@ -30,7 +30,13 @@ class DocParser:
         self.match_log_format =    "%15s %12s matched line %s"
         self.no_match_log_format = "%15s %12s matched line %s"
         self.parse_problems = []
-
+        self.heading_matcher = MatchHeading()
+        self.table_matcher = MatchTable()
+        self.list_matcher = MatchList()
+        self.quote_matcher = MatchQuote()
+        self.center_matcher = MatchCenter()
+        self.src_matcher = MatchSrc()
+        
     def get_parse_range(self):
         if self.current_section is None:
             return (0, len(self.lines))
@@ -171,6 +177,46 @@ class DocParser:
                 logger.warning("failed to parse properties starting on line %d", offset)
         return None
 
+    def next_greater_element(self, lines, start, end):
+        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
+        things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
+        pos = start
+        for line in lines[start:end]:
+            # greater elements
+            for match_type, matcher in dict(heading=self.heading_matcher,
+                                            table=self.table_matcher,
+                                            list=self.list_matcher,
+                                            quote=self.quote_matcher,
+                                            center=self.center_matcher).items():
+                match_res = matcher.match_line(line)
+                if match_res:
+                    parser = matcher.get_parse_tool(self)
+                    matched = match_res['matched']
+                    res = dict(match_type=match_type, pos=pos,
+                               parser=parser,
+                               string=matched.string,
+                               start=match_res['start'],
+                               end=match_res['end'],
+                               group_dict=matched.groupdict())
+                    return res
+            # lesser elements
+            pos += 1
+        return None
+
+    def detect_object(self, lines, start, end):
+        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
+        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
+        pos = start
+        for line in lines[start:end]:
+            if heading_matcher.match_line(line):
+                return dict(matched='heading', pos=pos)
+            if table_matcher.match_line(line):
+                return dict(matched='table', pos=pos)
+            if list_matcher.match_line(line):
+                return dict(matched='list', pos=pos)
+            pos += 1
+        return None
+
 class ParseTool:
 
     def __init__(self, doc_parser, name=None):
@@ -240,8 +286,7 @@ class SectionParse(ParseTool):
         while start_pos < self.end:
             for line in self.doc_parser.lines[start_pos:self.end]:
                 if line.upper().startswith('#+BEGIN'):
-                    detector = Detector(self.doc_parser)
-                    elem  = detector.detect_greater_element(self.doc_parser.lines, start_pos, self.end)
+                    elem  = self.doc_parser.next_greater_element(self.doc_parser.lines, start_pos, self.end)
                     print(elem)
                     parser = elem['parser']
                     self.doc_parser.push_parser(parser)
@@ -577,56 +622,5 @@ class ParagraphParse(ParseTool):
         Text(para, ' '.join(self.doc_parser.lines[self.start+1:self.end]))
         
 
-class Detector:
-    heading_matcher = MatchHeading()
-    table_matcher = MatchTable()
-    list_matcher = MatchList()
-    quote_matcher = MatchQuote()
-    center_matcher = MatchCenter()
-    # end of greater
-    src_matcher = MatchSrc()
-
-    def __init__(self, doc_parser):
-        self.doc_parser = doc_parser
-        
-    def detect_greater_element(self, lines, start, end):
-        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
-        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
-        pos = start
-        for line in lines[start:end]:
-            # greater elements
-            for match_type, matcher in dict(heading=self.heading_matcher,
-                                            table=self.table_matcher,
-                                            list=self.list_matcher,
-                                            quote=self.quote_matcher,
-                                            center=self.center_matcher).items():
-                match_res = matcher.match_line(line)
-                if match_res:
-                    parser = matcher.get_parse_tool(self.doc_parser)
-                    matched = match_res['matched']
-                    res = dict(match_type=match_type, pos=pos,
-                               parser=parser,
-                               string=matched.string,
-                               start=match_res['start'],
-                               end=match_res['end'],
-                               group_dict=matched.groupdict())
-                    return res
-            # lesser elements
-            pos += 1
-        return None
-
-    def detect_object(self, lines, start, end):
-        """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
-        things covered elsewhere such as the zeroth section, which is detected by the doc parser."""
-        pos = start
-        for line in lines[start:end]:
-            if heading_matcher.match_line(line):
-                return dict(matched='heading', pos=pos)
-            if table_matcher.match_line(line):
-                return dict(matched='table', pos=pos)
-            if list_matcher.match_line(line):
-                return dict(matched='list', pos=pos)
-            pos += 1
-        return None
 
     
