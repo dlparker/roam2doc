@@ -371,16 +371,12 @@ class ListParse(ParseTool):
         self.list_type = None
         self.margin = 0
         self.start_value = None
-
-        UNORDERED_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>[-+*])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
-        ORDERED_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>\d+[.)])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<contents>.*))?$'
-        DEF_LIST_regex = r'(?P<lindent>\s*)(?P<bullet>[-+*])\s+(?P<counter_set>\[@[a-z\d]+\])?(?:\s*(?P<checkbox>\[(?: |X|x|\+|-)\]))?(?:\s*(?P<tag>.*?)(?<!\s)\s*::\s*(?P<contents>.*))?$'
-
+        tool_box = ToolBox()
+        list_matcher = tool_box.get_matcher(MatcherType.alist)
         self.regexps = {
-            # Existing regexps...
-            ListType.unordered_list: re.compile(UNORDERED_LIST_regex),
-            ListType.ordered_list: re.compile(ORDERED_LIST_regex),
-            ListType.def_list: re.compile(DEF_LIST_regex), # definitionlist, but shorter name
+            ListType.unordered_list: list_matcher.get_compiled_regex(ListType.unordered_list),
+            ListType.ordered_list:  list_matcher.get_compiled_regex(ListType.ordered_list),
+            ListType.def_list:  list_matcher.get_compiled_regex(ListType.def_list),
         }
 
 
@@ -433,7 +429,7 @@ class ListParse(ParseTool):
             self.doc_parser.record_parse_problem(problem)
             return self.start
         self.tree_node = the_list
-        self.logger.debug(self.match_log_format, short_id, str(matcher), line)
+        self.logger.debug(self.match_log_format, short_id, "List", line)
         self.logger.debug("%15s %12s created item %s", short_id, '', item)
         tool_box = ToolBox()
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
@@ -668,6 +664,14 @@ class MatchList(LineRegexMatch):
     def __init__(self):
         super().__init__(self.all_patterns)
 
+    def get_compiled_regex(self, list_type):
+        if list_type == ListType.unordered_list:
+            return self.unordered_re
+        if list_type == ListType.ordered_list:
+            return self.ordered_re
+        if list_type == ListType.def_list:
+            return self.def_re
+        
     def match_line(self, line, require_type=None, ignore_type=None):
         if require_type is None and ignore_type is None:
             return super().match_line(line)
