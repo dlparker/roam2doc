@@ -1,8 +1,12 @@
 1. [X] Make list parse handing paras in items
 2. [X] Move all regexp to matchers
 3. [X] Change all explicit Matcher instantiations to a call to tool_box
-4. [ ] Consider making all parsers have a prop that reports the tree type it creates. ListParser could have subclasses
-5. [ ] Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
-6. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
-7. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
+4. [ ] Make Paras find objects
+5. [ ] Make Tables find objects
+6. [ ] Make list items find objects
+7. [ ] Document object parsing limitations, just name what is parsed and where
+8. [ ] Consider making all parsers have a prop that reports the tree type it creates. ListParser could have subclasses
+9. [ ] Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
+10. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
+11. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
    
