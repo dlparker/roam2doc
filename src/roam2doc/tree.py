@@ -60,6 +60,7 @@ class Root:
             out_lines = []
             out_lines.append("<html>")
             out_lines.append(" <head>")
+            out_lines.append('  <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>')
             out_lines.append("  <style>")
             for class_spec in self.css_classes.values():
                 styles = class_spec['styles']
@@ -264,6 +265,7 @@ class Section(Container):
         else:
             res = super().to_json_dict()
         return res
+
         
 class Paragraph(Container):
     """ A content container that is visually separated from the surrounding content
@@ -273,6 +275,16 @@ class Paragraph(Container):
     def __init__(self, parent):
         super().__init__(parent)
         
+    def to_html(self, indent_level):
+        lines = []
+        indent_level += 1
+        padding, line1 = setup_tag_open("p", indent_level, self)
+        line1 += ">"
+        lines.append(line1)
+        for node in self.children:
+            lines.extend(node.to_html(indent_level))
+        lines.append(padding + '</p>')
+        return lines
         
 class Text(Node):
     """ A node that has actual content, meaning text."""
@@ -474,6 +486,9 @@ class ListItem(Container):
                 self.line_contents.append(len(self.line_contents))
                 item.move_to_parent(self)
         self.level = level
+        # while parsing it is helpful to be able to collect lines that will
+        # be processed as paragraph data until the moment for parsing arrives
+        self.para_lines = []
 
     def to_html(self, indent_level):
 

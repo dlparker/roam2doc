@@ -10,7 +10,7 @@
 [[http://example.com]]
 [[https://example.com]]
 
-[[image path]]
+[[https://fastly.picsum.photos/id/965/200/300.jpg?hmac=16gh0rrQrvUF3RJa52nRdq8hylkBd-pL4Ff9kqsNRDQ][image_path]]
 
 *bold text*
 

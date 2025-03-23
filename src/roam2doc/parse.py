@@ -264,7 +264,6 @@ class SectionParse(ParseTool):
             self.heading_text = first_line[last_star + 1:].strip()
             if self.end == self.start:
                 return True
-            self.cursor += 1
             return True
         # We don't have an actual heading, just start of file.
         # We need to figure out some kind of text for a heading, cause
@@ -282,10 +281,15 @@ class SectionParse(ParseTool):
         found_heading = self.calc_level()
         if found_heading:
             self.cursor = self.start + 1
-        self.tree_node = Section(self.doc_parser.branch, self.heading_text)
+        parent = self.get_parent_parser()
+        if parent:
+            tree_parent = parent.tree_node
+        else:
+            tree_parent = self.doc_parser.branch
+        self.tree_node = Section(tree_parent, self.heading_text)
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
-            return
+            return self.end
         self.properties = self.doc_parser.parse_properties(self.cursor, self.end)
         short_id = f"Section@{self.start}"
         if self.properties:
@@ -325,7 +329,7 @@ class SectionParse(ParseTool):
                 if last_sub_end < self.end + 1:
                     para = ParagraphParse(self.doc_parser, last_sub_end + 1, self.end)
                     self.doc_parser.push_parser(para)
-                    para.parse() + 1
+                    para.parse()
                     self.doc_parser.pop_parser(para)
                     pos = self.end + 1
         return self.end
@@ -403,8 +407,8 @@ class ListParse(ParseTool):
         tree_parent = parent_parser.tree_node
         if isinstance(parent, ListParse):
             parent_list = parent_parser.tree_node
-            last_item = parent_list.children[-1]
-            tree_parent = last_item
+            parent_last_item = parent_list.children[-1]
+            tree_parent = parent_last_item
         if list_type == ListType.ordered_list:
             the_list = OrderedList(parent=tree_parent, margin=margin)
             content_list = [Text(the_list, match_res['contents']),]
@@ -434,19 +438,20 @@ class ListParse(ParseTool):
         spaces_per_level = 0
         para_lines = []
         pos += 1
+        current_item = item
         while pos < end + 1:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if (heading_matcher.match_line(line) 
                     or table_matcher.match_line(line)):
                     self.logger.debug(self.match_log_format, short_id, str(matcher), line)
-                    if len(para_lines) > 0:
-                        self.append_lines_to_item(item, para_lines)
+                    if len(item.para_lines) > 0:
+                        self.handle_item_para(item)
                     return pos - 1
                 if line.strip() == '':
                     blank_count += 1
                     if blank_count == 2:
-                        if len(para_lines) > 0:
-                            self.append_lines_to_item(item, para_lines)
+                        if len(item.para_lines) > 0:
+                            self.handle_item_para(item)
                         if isinstance(parent, ListParse):
                             return pos - 2
                         BlankLine(item)
@@ -455,13 +460,15 @@ class ListParse(ParseTool):
                     pos += 1
                     break
                 elif blank_count:
-                    blank_count += 1
+                    blank_count -= 1
                 match_res = self.list_line_get_type(line)
                 if match_res is None:
-                    para_lines.append(line)
+                    current_item.para_lines.append(pos)
                     pos += 1
                     break
                 if match_res['list_type'] != list_type:
+                    if len(item.para_lines) > 0:
+                        self.handle_item_para(item)
                     if isinstance(parent, ListParse):
                         if match_res['list_type'] == parent.list_type:
                             return pos - 1
@@ -492,11 +499,11 @@ class ListParse(ParseTool):
                     content_list = [Text(the_list, match_res['contents']),]
                     desc = DictionaryListItemDescription(the_list, content_list)
                     item = DefinitionListItem(the_list, title, desc)
-                last_item = item
+                current_item = item
                 self.logger.debug("%15s %12s created item %s", short_id, '', item)
                 pos += 1
-        if len(para_lines) > 0:
-            self.append_lines_to_item(item, para_lines)
+        if len(item.para_lines) > 0:
+            self.handle_item_para(item)
         return pos 
                 
     def list_line_get_type(self, line):
@@ -506,8 +513,14 @@ class ListParse(ParseTool):
                 return match_res
         return None
 
-    def append_lines_to_item(self, item, lines):
-        raise Exception('not yet dealing with list item content paragraphs')
+    def handle_item_para(self, item):
+        if len(item.para_lines) < 1:
+            return
+        para = ParagraphParse(self.doc_parser, item.para_lines[0], item.para_lines[-1])
+        self.doc_parser.push_parser(para)
+        para.parse()
+        self.doc_parser.pop_parser(para)
+        item.para_lines = []
 
     def parse_list_item(self, line, list_type):
         """Parse a single list item line and return its components."""
@@ -542,10 +555,10 @@ class ParagraphParse(ParseTool):
         self.logger = logging.getLogger('roam2doc-parser')
         
     def parse(self):
-        sec_p = self.get_section_parser()
-        para = Paragraph(sec_p.tree_node)
+        parent = self.get_parent_parser()
+        para = Paragraph(parent.tree_node)
         last_was_blank = False
-        self.logger.debug('Adding paragraph to section %s', sec_p)
+        self.logger.debug('Adding paragraph to parser %s', parent)
         pos = self.start
         for line in self.doc_parser.lines[self.start:self.end + 1]:
             pos += 1
@@ -554,10 +567,11 @@ class ParagraphParse(ParseTool):
                 last_was_blank = True
             else:
                 if last_was_blank:
-                    self.logger.debug('Adding paragraph to section %s', sec_p)
-                    para = Paragraph(sec_p.tree_node)
-                last_was_blank = False
-                Text(para, line)
+                    self.logger.debug('Adding paragraph to parent %s', parent)
+                    para = Paragraph(parent.tree_node)
+                    buff = []
+                    last_was_blank = False
+                Text(para, line.strip())
         return pos 
 
 class LineRegexMatch:
