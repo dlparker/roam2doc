@@ -242,6 +242,9 @@ def test_mixed_elems():
     lines.append('')
     lines.append('')
     lines.append('this other text should be in Section 2-2 after list')
+    lines.append('* Section 3')
+    lines.append('| a | 1 |')
+    lines.append('| b | 2 |')
     
     buff = '\n'.join(lines)
 

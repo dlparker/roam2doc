@@ -50,7 +50,7 @@ class Root:
     def add_css_class(self, class_spec):
         self.css_classes[class_spec['name']] = class_spec
         
-    def to_html(self, wrap=True, make_pretty=True):
+    def to_html(self, wrap=True, make_pretty=True, include_json=False):
         self.css_classes = {}
         indent_level = 0
         lines = []
@@ -70,10 +70,11 @@ class Root:
                 out_lines.append("}")
             
             out_lines.append("  </style>")
-            out_lines.append("  <script>")
-            obj_tree = json.dumps(self, default=lambda o:o.to_json_dict(), indent=4)
-            out_lines.append(f"      var obj_tree = {obj_tree};")
-            out_lines.append("  </script>")
+            if include_json:
+                out_lines.append("  <script>")
+                obj_tree = json.dumps(self, default=lambda o:o.to_json_dict(), indent=4)
+                out_lines.append(f"      var obj_tree = {obj_tree};")
+                out_lines.append("  </script>")
             out_lines.append(" </head>")
             out_lines.append("<body>")
             out_lines.extend(lines)

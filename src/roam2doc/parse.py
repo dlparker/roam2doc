@@ -34,12 +34,6 @@ class DocParser:
         self.no_match_log_format = "%15s %12s matched line %s"
         self.parser_stack = []
         self.parse_problems = []
-        self.heading_matcher = MatchHeading()
-        self.table_matcher = MatchTable()
-        self.list_matcher = MatchList()
-        self.quote_matcher = MatchQuote()
-        self.center_matcher = MatchCenter()
-        self.src_matcher = MatchSrc()
         self.logger = logging.getLogger('roam2doc-parser')
         
     def get_parse_range(self):
@@ -101,8 +95,10 @@ class DocParser:
             return None
         # single line file is possible
         subs = lines[pos:]
+        tool_box = ToolBox()
+        heading_matcher = tool_box.get_matcher(MatcherType.heading)
         for line in subs:
-            if MatchHeading().match_line(line):
+            if heading_matcher.match_line(line):
                 end_pos = pos - 1
                 break
             pos += 1
@@ -295,7 +291,6 @@ class SectionParse(ParseTool):
         if self.properties:
             self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
             self.cursor += len(self.properties) + 2
-        line_matchers = [MatchTable(), MatchList()]
         tool_box = ToolBox()
         # now find all greater elements
         pos = self.cursor
@@ -311,7 +306,6 @@ class SectionParse(ParseTool):
                 parse_tool = elem['parse_tool']
                 match_pos = elem['match_line']
                 if match_pos > last_sub_end:
-                    print(f'text between {last_sub_end} and {match_pos} has no greaters in it')
                     para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1)
                     self.doc_parser.push_parser(para)
                     para.parse() + 1
@@ -347,18 +341,27 @@ class TableParse(ParseTool):
         
     def parse(self):
         parent_parser = self.doc_parser.get_parser_parent(self)
-        matcher = MatchTable()
+        parent_tree_node = parent_parser.tree_node
+        table = Table(parent_tree_node)
+        tool_box = ToolBox()
+        matcher = tool_box.get_matcher(MatcherType.table)
         pos = start_pos = self.start
         short_id = f"Table@{start_pos}"
-        while start_pos < end:
-            for line in self.doc_parser.lines[start_pos:self.end]:
+        while pos < self.end + 1:
+            for line in self.doc_parser.lines[pos:self.end + 1]:
+                next_elem = tool_box.next_greater_element(self.doc_parser, pos, self.end)
+                if not next_elem:
+                    return pos - 1
+                if next_elem['match_type'] != MatcherType.table:
+                    return pos - 1
+                self.logger.debug(self.match_log_format, short_id, str(matcher), line)
+                tr = TableRow(table)
+                for item in line.split('|')[1:-1]:
+                    cell = TableCell(tr)
+                    text = Text(tr, item)
+
                 pos += 1
-                if len(line) == 0:
-                    continue
-                if matcher.match_line(line):
-                    self.logger.debug(self.match_log_format, short_id, str(matcher), line)
-                else:
-                    return pos - 1 
+        return self.end
             
 
 class ListParse(ParseTool):
@@ -432,8 +435,8 @@ class ListParse(ParseTool):
         self.tree_node = the_list
         self.logger.debug(self.match_log_format, short_id, str(matcher), line)
         self.logger.debug("%15s %12s created item %s", short_id, '', item)
-        heading_matcher = MatchHeading()
-        table_matcher = MatchTable()
+        tool_box = ToolBox()
+        heading_matcher = tool_box.get_matcher(MatcherType.heading)
         blank_count = 0
         spaces_per_level = 0
         para_lines = []
@@ -441,8 +444,7 @@ class ListParse(ParseTool):
         current_item = item
         while pos < end + 1:
             for line in self.doc_parser.lines[pos:end + 1]:
-                if (heading_matcher.match_line(line) 
-                    or table_matcher.match_line(line)):
+                if heading_matcher.match_line(line):
                     self.logger.debug(self.match_log_format, short_id, str(matcher), line)
                     if len(item.para_lines) > 0:
                         self.handle_item_para(item)
