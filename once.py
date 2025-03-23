@@ -36,14 +36,13 @@ def t2():
     lines.append('          this should be para 1 line 3 inside List 2 sub 1 sub 1')
     lines.append('')
     lines.append('          this should be para 2 line 1 inside List 2 sub 1 sub 1')
+    lines.append('          this should be para 2 line 2 inside List 2 sub 1 sub 1')
+    lines.append('          this should be para 2 line 3 inside List 2 sub 1 sub 1')
     lines.append('')
     lines.append('')
     lines.append('this other text should be in Section 2-2 after list')
     
     buff = '\n'.join(lines)
-    lines.append('          this should be para 2 line 1 inside List 2 sub 1 sub 1')
-    lines.append('          this should be para 2 line 2 inside List 2 sub 1 sub 1')
-    lines.append('          this should be para 2 line 3 inside List 2 sub 1 sub 1')
 
     doc_parser = DocParser(buff, "inline")
     doc_parser.parse()
