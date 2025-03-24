@@ -7,6 +7,7 @@
 7. [ ] Document object parsing limitations, just name what is parsed and where
    1. bold text not allowed in headings, heading will be converted to regular/bold text
    2. verbatim strings (=string=) cannot contain =, use ~ for that if you need it
+   3. nested definition lists are not nested when converted to html. Some controversy on what is right
 8. [ ] Write tests for regex tools
 9. [ ] Get margin for everthing and figure out how to apply css to duplicate it. Best effort, not everything.
 10. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback

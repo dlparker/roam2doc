@@ -196,6 +196,13 @@ def test_mixed_elems():
     lines.append('          this should be para 2 line 3 inside List 2 sub 1 sub 1')
     lines.append('')
     lines.append('')
+
+    lines.append('+ foo :: a word ofen used by programmers')
+    lines.append('+ bar :: another word ofen used by programmers')
+    lines.append('   + foobar :: see a pattern?')
+    lines.append('')
+    lines.append('')
+    
     lines.append('this other text should be in Section 2-2 after list')
     lines.append('* Section 3')
     lines.append('| a | 1 |')
@@ -208,7 +215,6 @@ def test_mixed_elems():
     doc_parser = DocParserWrap(buff, "inline")
     doc_parser.parse()
     print(doc_parser.root.to_html())
-    
     
     
 def test_no_elems():
@@ -263,4 +269,43 @@ def test_objects():
     doc_parser.parse()
     print(doc_parser.root.to_html())
     
+    
+def test_def_list():
+    lines = []
+    lines.append('* a section')
+    lines.append('+ foo :: a word ofen used by programmers')
+    lines.append('+ bar :: another word ofen used by programmers')
+    lines.append('   + foobar :: see a pattern?')
+    lines.append('')
+    lines.append('')
+    buff = '\n'.join(lines)
+    
+    logger = logging.getLogger("test_code")
+    logger.info("starting test_no_elems")
+    doc_parser = DocParserWrap(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
+
+
+def test_def_list_2():
+    lines = []
+    lines.append('* a section')
+    lines.append('- unordered list starts')
+    lines.append('  - unordered sub 1')
+    lines.append('    - unordered sub 1 subsub 1')
+    lines.append('  - unordered sub 2')
+    lines.append('- unordered second ')
+    lines.append('  + foo :: a word ofen used by programmers')
+    lines.append('  + bar :: another word ofen used by programmers')
+    lines.append('    + foobar :: see a pattern?')
+    lines.append('    + beebop :: arubop')
+    lines.append('')
+    lines.append('')
+    buff = '\n'.join(lines)
+    
+    logger = logging.getLogger("test_code")
+    logger.info("starting test_no_elems")
+    doc_parser = DocParserWrap(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
     

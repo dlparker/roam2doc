@@ -178,7 +178,7 @@ class Node:
     def __str__(self):
         msg = f"({self.node_id}) {self.__class__.__name__} "
         index = self.parent.children.index(self)
-        msg += f"{index} child of obj {self.parent.node_id}"
+        msg += f"{index}th child of obj {self.parent.node_id}"
         return msg
 
     def get_css_styles(self):
@@ -470,14 +470,13 @@ class List(Container):
 
 class ListItem(Container):
 
-    def __init__(self, parent, level=1, line_contents=None):
+    def __init__(self, parent, line_contents=None):
         super().__init__(parent)
         self.line_contents = []  #index into children of the items on the line, other childen possible
         if line_contents:
             for item in line_contents:
                 self.line_contents.append(len(self.line_contents))
                 item.move_to_parent(self)
-        self.level = level
         # while parsing it is helpful to be able to collect lines that will
         # be processed as paragraph data until the moment for parsing arrives
         self.para_lines = []
@@ -504,7 +503,7 @@ class ListItem(Container):
         ## fiddle the resluts around to make it easier to understand
         ## by getting the children last
         superres = super().to_json_dict()
-        lres = dict(level=self.level, line_contents=self.line_contents)
+        lres = dict(line_contents=self.line_contents)
         lres.update(superres['props'])
         res = dict(cls=superres['cls'], props=lres)
         return res
@@ -526,11 +525,10 @@ class OrderedList(List):
 
 class OrderedListItem(ListItem):
 
-    def __init__(self, parent, level=1, ordinal=None, line_contents=None):
-        super().__init__(parent, level, line_contents)
+    def __init__(self, parent, ordinal=None, line_contents=None):
+        super().__init__(parent, line_contents)
         self.ordinal = ordinal
 
-    pass
 
 class UnorderedList(List):
 
@@ -582,6 +580,8 @@ class DefinitionListItem(ListItem):
         indent_level += 1
         lines.extend(self.title.to_html(indent_level))
         lines.extend(self.description.to_html(indent_level))
+        for node in self.children:
+            lines.extend(node.to_html(indent_level))
         return lines
 
     def to_json_dict(self):
@@ -625,7 +625,6 @@ class Table(Container):
         res.append(dict(name="margin-left", value="10em"))
         res.append(dict(name="border", value="1px solid black"))
         return res
-
     
     def to_html(self, indent_level):
         lines = []

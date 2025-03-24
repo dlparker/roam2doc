@@ -88,7 +88,7 @@ def build_tree_1():
     # because that could happen!
     bits = [Text(root, "DictDesc1 start "),  TargetText(root, "Target 2"), Text(root, "DictDescEnd")]
     dli1_desc = DefinitionListItemDescription(dlist1, bits)
-    dli1_item = DefinitionListItem(dlist1, dli1_title, dli1_desc)
+    dli1_item = DefinitionListItem(dlist1, 1, dli1_title, dli1_desc)
 
     dli2_title = DefinitionListItemTitle(dlist1, "DicTitleTheSecond")
     # make a descripion with multiple text items and a TargetText
@@ -96,7 +96,7 @@ def build_tree_1():
     bits = [Text(root, "What a boring definition."),
             Text(root, "It just goes on and on.")]
     dli2_desc = DefinitionListItemDescription(dlist1, bits)
-    dli2_item = DefinitionListItem(dlist1, dli2_title, dli2_desc)
+    dli2_item = DefinitionListItem(dlist1, 1,  dli2_title, dli2_desc)
     
     table_section = Section(root.trunk, heading_text="Table Section")
     table1 = Table(table_section)

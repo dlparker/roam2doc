@@ -45,6 +45,21 @@ def t2():
     lines.append('| a | 1 |')
     lines.append('| b | 2 |')
     lines.append('| c | 3 |')
+    lines.append('')
+    lines.append('')
+    lines.append('* a section')
+    lines.append('- unordered list starts')
+    lines.append('  - unordered sub 1')
+    lines.append('    - unordered sub 1 subsub 1')
+    lines.append('  - unordered sub 2')
+    lines.append('- unordered second ')
+    lines.append('  + foo :: a word ofen used by programmers')
+    lines.append('  + bar :: another word ofen used by programmers')
+    lines.append('    + foobar :: see a pattern?')
+    lines.append('    + beebop :: arubop')
+    lines.append('')
+    lines.append('')
+    
     
     buff = '\n'.join(lines)
 

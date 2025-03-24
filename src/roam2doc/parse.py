@@ -34,11 +34,6 @@ class DocParser:
         self.parse_problems = []
         self.logger = logging.getLogger('roam2doc-parser')
         
-    def get_parse_range(self):
-        if self.current_section is None:
-            return (0, len(self.lines))
-        return (self.current_section.cursor, self.current_section.end)
-    
     def push_parser(self, parser):
         self.parser_stack.append(parser)
 
@@ -63,29 +58,28 @@ class DocParser:
     def record_parse_problem(self, problem_dict):
         self.parse_problems.append(problem_dict)
     
-    def find_first_section(self, offset=0, include_blank_start=False):
-        """ Section parsing it done by finding the start and the end before parsing. This allows the section
-        parser to be the parent of all other parsers, simplifying the logic in most of those."""
-        lines = self.lines[offset:]
-        pos = -1
-        start_pos = -1
-        # we have a section start, whether there is a heading or not
-        # look for something that starts another section or end of file, skipping
-        # the first line which may or may not be a heading
-        end_pos = len(lines)  - 1
-        pos  = 0
-        if pos >= end_pos + 1:
-            return None
-        # single line file is possible
-        subs = lines[pos:]
+    def find_first_section(self, offset=0):
+        pos = offset
+        start_pos = pos
+        end_pos = 0
+        level = 1
+        heading_text = None
+        # if the first line is not a heading, then we don't have one,
+        # we have a zeroth section with no heading
         tool_box = ToolBox()
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
-        for line in subs:
-            if heading_matcher.match_line(line):
-                end_pos = pos - 1
+        elem = heading_matcher.match_line(self.lines[pos])
+        if elem:
+            stars =  elem['groupdict']['stars']
+            level = len(stars)
+            heading_text = elem['groupdict']['heading']
+            pos += 1
+        while pos < len(self.lines):
+            if heading_matcher.match_line(self.lines[pos]):
                 break
             pos += 1
-        return SectionParse(self, start_pos + offset, end_pos + offset)
+        end_pos = pos - 1
+        return SectionParse(self, offset, end_pos)
 
     def parse_file_start(self):
         """ This method is broken out from the parse method to make it easier to build
@@ -106,7 +100,7 @@ class DocParser:
             start_offset += 1
             self.logger.info("Found file title, setting offset to %s", start_offset)
             self.logger.debug("File title = %s", pformat(title))
-        section = self.find_first_section(start_offset, include_blank_start=True)
+        section = self.find_first_section(start_offset)
         return section
 
     def find_top_sections(self):
@@ -117,8 +111,8 @@ class DocParser:
         self.sections.append(first_section)
         self.logger.info("found level 1 section %d lines %d to %s of %d",
                          0, 
-                         first_section.start + 1,
-                         first_section.end + 1,
+                         first_section.start,
+                         first_section.end,
                          len(self.lines))
         tool_box = ToolBox()
         pos = start_offset + 1
@@ -146,8 +140,8 @@ class DocParser:
             section = SectionParse(self, start, end)
             self.logger.info("found level 1 section %d lines %d to %s of %d",
                         len(self.sections),
-                        section.start + 1,
-                        section.end + 1,
+                        section.start,
+                        section.end,
                         len(self.lines))
             self.sections.append(section)
         
@@ -202,7 +196,6 @@ class ParseTool:
 
     def __init__(self, doc_parser, start, end):
         self.doc_parser = doc_parser
-        range = doc_parser.get_parse_range()
         self.tree_node = None
         self.start = start
         self.end = end
@@ -228,7 +221,6 @@ class SectionParse(ParseTool):
     def __init__(self, doc_parser, start, end):
         self.start = start
         self.end = end
-        self.cursor = start
         self.level = 0
         self.heading_text = None
         self.properties = None
@@ -257,8 +249,9 @@ class SectionParse(ParseTool):
 
     def parse(self):
         found_heading = self.calc_level()
+        pos = self.start
         if found_heading:
-            self.cursor = self.start + 1
+            pos += 1
         parent = self.get_parent_parser()
         if parent:
             tree_parent = parent.tree_node
@@ -268,16 +261,15 @@ class SectionParse(ParseTool):
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
             return self.end
-        self.properties = self.doc_parser.parse_properties(self.cursor, self.end)
+        self.properties = self.doc_parser.parse_properties(pos, self.end)
         short_id = f"Section@{self.start}"
         if self.properties:
             self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
-            self.cursor += len(self.properties) + 2
+            pos += len(self.properties) + 2
         tool_box = ToolBox()
         # now find all greater elements
-        pos = self.cursor
-        last_sub_start = pos - 1
-        last_sub_end = pos - 1
+        last_sub_start = pos
+        last_sub_end = pos 
         gaps = []
         while pos < self.end + 1:
             elem  = tool_box.next_greater_element(self.doc_parser, pos, self.end)
@@ -350,8 +342,9 @@ class ListParse(ParseTool):
     def __init__(self, doc_parser, start, end):
         super().__init__(doc_parser, start, end)
         self.list_type = None
-        self.margin = 0
         self.start_value = None
+        self.margin = 0
+        self.spaces_per_level = 0
         tool_box = ToolBox()
         list_matcher = tool_box.get_matcher(MatcherType.alist)
         self.regexps = {
@@ -373,56 +366,62 @@ class ListParse(ParseTool):
         match_res = self.list_line_get_type(line)
         if match_res is None:
             # we are going to follow the rule of ignoring text that confuses
-            # use, just recoring the problem
+            # us, just record the problem
             problem = dict(description="List parser called with first line that is not a list item",
                            problem_line_pos=pos, problem_line=line)
             self.doc_parser.record_parse_problem(problem)
             return
         # This will be the margin for all list items, so the
         # depth calculation needs to subtract this first
-        margin = match_res['lindent']
-        self.list_type = list_type = match_res['list_type']
-        level = 1
         parent = self.get_parent_parser()
         tree_parent = parent_parser.tree_node
+        if isinstance(parent, ListParse):
+            self.margin = parent.margin
+            self.spaces_per_level = parent.spaces_per_level
+            my_start_level = 1
+            tmp = parent
+            while tmp and isinstance(tmp, ListParse):
+                my_start_level += 1
+                tmp = tmp.get_parent_parser()
+        else:
+            self.margin = margin = match_res['lindent']
+            my_start_level = 1
+        self.list_type = list_type = match_res['list_type']
         if isinstance(parent, ListParse):
             parent_list = parent_parser.tree_node
             parent_last_item = parent_list.children[-1]
             tree_parent = parent_last_item
         if list_type == ListType.ordered_list:
-            the_list = OrderedList(parent=tree_parent, margin=margin)
+            the_list = OrderedList(parent=tree_parent, margin=self.margin)
             content_list = [Text(the_list, match_res['contents']),]
             ordinal = match_res['bullet'].rstrip(".").rstrip(')')
-            item = OrderedListItem(the_list, level, ordinal, content_list)
+            item = OrderedListItem(the_list, ordinal, content_list)
         elif list_type == ListType.unordered_list:
-            the_list = UnorderedList(parent=tree_parent, margin=margin)
+            the_list = UnorderedList(parent=tree_parent, margin=self.margin)
             content_list = [Text(the_list, match_res['contents']),]
-            item = UnorderedListItem(the_list, level, content_list)
+            item = UnorderedListItem(the_list, content_list)
         elif list_type == ListType.def_list:
-            the_list = DictionaryList(parent=tree_parent, margin=margin)
-            title = DictionaryListItemTitle(the_list, match_res['tag'])
+            the_list = DefinitionList(parent=tree_parent, margin=self.margin)
+            title = DefinitionListItemTitle(the_list, match_res['tag'])
             content_list = [Text(the_list, match_res['contents']),]
-            desc = DictionaryListItemDescription(the_list, content_list)
+            desc = DefinitionListItemDescription(the_list, content_list)
             item = DefinitionListItem(the_list, title, desc)
-        else:
-            desc = "List parser code is buggy, detected a list type but has no code for it"
-            problem = dict(description=desc, problem_line_pos=pos, problem_line=line)
-            self.doc_parser.record_parse_problem(problem)
-            return self.start
+        # unless self.list_line_get_type(line) is broken, one of the above MUST match
         self.tree_node = the_list
-        self.logger.debug(self.match_log_format, short_id, "List", line)
-        self.logger.debug("%15s %12s created item %s", short_id, '', item)
+        self.logger.info(self.match_log_format, short_id, "List", line)
+        self.logger.info("%15s %12s created item %s at level %d", short_id, '', the_list, my_start_level)
+        self.logger.info("%15s %12s created item %s", short_id, '', item)
         tool_box = ToolBox()
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
         blank_count = 0
-        spaces_per_level = 0
         para_lines = []
         pos += 1
         current_item = item
+        level = my_start_level
         while pos < end + 1:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if heading_matcher.match_line(line):
-                    self.logger.debug(self.match_log_format, short_id, str(matcher), line)
+                    self.logger.info(self.match_log_format, short_id, str(matcher), line)
                     if len(item.para_lines) > 0:
                         self.handle_item_para(item)
                     return pos - 1
@@ -445,38 +444,40 @@ class ListParse(ParseTool):
                     current_item.para_lines.append(pos)
                     pos += 1
                     break
-                if match_res['list_type'] != list_type:
+                self.logger.info(self.match_log_format, short_id, str(matcher), line)
+                if self.spaces_per_level != 0:
+                    level = int(match_res['lindent'] / self.spaces_per_level) + 1
+                    self.logger.debug("List left indent spaces %d gives level %d", match_res['lindent'], level) 
+                else:
+                    if match_res['lindent'] > self.margin:
+                        # this line is indented beyond first so we can calc the
+                        # indent to level ratio
+                        self.spaces_per_level = match_res['lindent'] - self.margin
+                        level = 2
+                        self.logger.debug("List indent spaces per level calculated to be %d", self.spaces_per_level)
+                if level < my_start_level:
+                    self.logger.debug("List parser returning at pos %d", pos - 1)
+                    return pos - 1
+                if match_res['list_type'] != list_type or level > my_start_level:
+                    self.logger.debug("Processing sub list of type %s at pos  %d", match_res['list_type'], pos)
                     if len(item.para_lines) > 0:
                         self.handle_item_para(item)
-                    if isinstance(parent, ListParse):
-                        if match_res['list_type'] == parent.list_type:
-                            return pos - 1
                     parser = ListParse(self.doc_parser, pos, self.end)
                     self.doc_parser.push_parser(parser)
                     pos = parser.parse() + 1
                     self.doc_parser.pop_parser(parser)
                     break
-                level = 1
-                if spaces_per_level != 0:
-                    level = int(match_res['lindent'] / spaces_per_level) + 1
-                else:
-                    if match_res['lindent'] > margin:
-                        # this line is indented beyond first so we can calc the
-                        # indent to level ratio
-                        spaces_per_level = match_res['lindent'] - self.margin
-                        level = int(match_res['lindent'] / spaces_per_level) + 1
-                self.logger.debug(self.match_log_format, short_id, str(matcher), line)
                 if list_type == ListType.ordered_list:
                     content_list = [Text(the_list, match_res['contents']),]
                     ordinal = match_res['bullet'].rstrip(".").rstrip(')')
-                    item = OrderedListItem(the_list, level, ordinal, content_list)
+                    item = OrderedListItem(the_list, ordinal, content_list)
                 elif list_type == ListType.unordered_list:
                     content_list = [Text(the_list, match_res['contents']),]
-                    item = UnorderedListItem(the_list, level, content_list)
+                    item = UnorderedListItem(the_list, content_list)
                 elif list_type == ListType.def_list:
-                    title = DictionaryListItemTitle(the_list, match_res['tag'])
+                    title = DefinitionListItemTitle(the_list, match_res['tag'])
                     content_list = [Text(the_list, match_res['contents']),]
-                    desc = DictionaryListItemDescription(the_list, content_list)
+                    desc = DefinitionListItemDescription(the_list, content_list)
                     item = DefinitionListItem(the_list, title, desc)
                 current_item = item
                 self.logger.debug("%15s %12s created item %s", short_id, '', item)
@@ -486,7 +487,8 @@ class ListParse(ParseTool):
         return pos 
                 
     def list_line_get_type(self, line):
-        for bullettype in [ListType.ordered_list, ListType.unordered_list, ListType.def_list]:
+        # check def_list first, looks like unordered too
+        for bullettype in [ListType.def_list, ListType.ordered_list, ListType.unordered_list]:
             match_res = self.parse_list_item(line, bullettype)
             if match_res:
                 return match_res
@@ -503,17 +505,16 @@ class ListParse(ParseTool):
 
     def parse_list_item(self, line, list_type):
         """Parse a single list item line and return its components."""
-        if list_type == "def":
+        if list_type == ListType.def_list:
             pattern = self.regexps[ListType.def_list]
         elif list_type == ListType.ordered_list:
             pattern = self.regexps[ListType.ordered_list]
         else:  # unordered
             pattern = self.regexps[ListType.unordered_list]
-        match = pattern.match(line)
-        if not match:
+        match_res = pattern.match(line)
+        if not match_res:
             return None
-
-        parts = match.groupdict()
+        parts = match_res.groupdict()
         return {
             'list_type': list_type,
             'lindent': len(parts['lindent']),
@@ -737,29 +738,25 @@ class MatchList(LineRegexMatch):
         if list_type == ListType.def_list:
             return self.def_re
         
-    def match_line(self, line, require_type=None, ignore_type=None):
-        if require_type is None and ignore_type is None:
-            return super().match_line(line)
-        # Instead of the usual initize time list of patterns,
-        # we manipulated it for each pattern and call the super,
-        # that way we know which pattern matched. Most (all?)
-        # other children of regex match don't care.
-        if require_type:
-            if require_type == ListType.ordered_list:
-                self.patterns = [ordered_re,]
-            if require_type == ListType.unordered_list:
-                self.patterns = [unordered_re,]
-            if require_type == ListType.def_list:
-                self.patterns = [def_re,]
-        else:
-            self.patterns = list(self.all_patterns)
-            if ignore_type == ListType.ordered_list:
-                self.patterns.remove(ordered_re)
-            if ignore_type == ListType.unordered_list:
-                self.patterns.remove(unordered_re)
-            if ignore_type == ListType.def_list:
-                self.patterns.remove(def_re)
-        return super.match_line(line)
+    def match_line(self, line):
+        if line.strip() == '':
+            return None
+        self.patterns = [self.ordered_re,]
+        res = super().match_line(line)
+        if res:
+            res['list_type'] = ListType.ordered_list
+            return res
+        # need to do def first, to prevent unordered from matching it
+        self.patterns = [self.def_re,]
+        res = super().match_line(line)
+        if res:
+            res['list_type'] = ListType.def_list
+            return res
+        self.patterns = [self.unordered_re,]
+        res = super().match_line(line)
+        if res:
+            res['list_type'] = ListType.unordered_list
+            return res
         
     def get_parse_tool(self):
         return ListParse
