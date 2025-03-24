@@ -1,7 +1,7 @@
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
                          UnderlinedText, LinethroughText, InlineCodeText,
-                         MonospaceText, Blockquote, CodeBlock, List,
+                         VerbatimText, Blockquote, CodeBlock, List,
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
@@ -39,7 +39,7 @@ def build_tree_1():
     BlankLine(text_para)
     lttext1 = LinethroughText(text_para, "Should be strike through!")
     BlankLine(text_para)
-    monottext1 = MonospaceText(text_para, "Should be monospace!")
+    monottext1 = VerbatimText(text_para, "Should be monospace!")
     BlankLine(text_para)
     
     incode = InlineCodeText(text_para, "Should be inline code.")

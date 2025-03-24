@@ -6,13 +6,11 @@ from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
                          UnderlinedText, LinethroughText, InlineCodeText,
-                         MonospaceText, Blockquote, CodeBlock, List,
+                         VerbatimText, Blockquote, CodeBlock, List,
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
                          Table, TableRow, TableCell, Link, Image, InternalLink)
-
-
 
 class DocParser:
 
@@ -71,26 +69,11 @@ class DocParser:
         lines = self.lines[offset:]
         pos = -1
         start_pos = -1
-        # skip any blank lines
-        for line in lines:
-            pos += 1
-            if line.strip() == "":
-                if not include_blank_start:
-                    # If the first section has not been found yet,
-                    # we want to include all the text. This condition
-                    # is likely to occur when there are file level
-                    # properties or a title and a blank line got
-                    # added right after those. It is legal, if meaningless.
-                    continue
-            start_pos = pos
-            break
-        if start_pos == - 1:
-            return None
         # we have a section start, whether there is a heading or not
         # look for something that starts another section or end of file, skipping
         # the first line which may or may not be a heading
         end_pos = len(lines)  - 1
-        pos += 1
+        pos  = 0
         if pos >= end_pos + 1:
             return None
         # single line file is possible
@@ -148,7 +131,7 @@ class DocParser:
             pos += 1
             if elem['match_type'] != MatcherType.heading:
                 continue
-            stars =  elem['group_dict']['stars']
+            stars =  elem['matched_contents']['stars']
             level = len(stars)
             if level > 1:
                 continue
@@ -651,12 +634,30 @@ class ItalicObjectMatcher(ObjectRegexMatch):
         super().__init__(self.patterns)
 
 class UnderlinedObjectMatcher(ObjectRegexMatch):
-    patterns = [re.compile(r'(?<!_)_(?P<text>[^_\s](?:[^_]*[^_\s])?)_(?!_)'),]
-                
+    patterns = [re.compile(r'\b_(?P<text>\w*)_\b', re.M),
+                re.compile(r'\b_(?P<text>[a-zA-Z0-9[ ]*)_\b')]
     def __init__(self):
         super().__init__(self.patterns)
+        
+class LineThroughObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'\+(?P<text>.+?)\+'),]
+    
+    def __init__(self):
+        super().__init__(self.patterns)
+        
+class InlineCodeObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'=(?P<text>.+?)='),
+                re.compile(r'~(?P<text>.+?)~')]
 
+    def __init__(self):
+        super().__init__(self.patterns)
+        
+class VerbatimObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'=(?P<text>.+?)='),]
 
+    def __init__(self):
+        super().__init__(self.patterns)
+        
 class MatchHeading(LineRegexMatch):
     patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
 
@@ -853,7 +854,7 @@ class MatcherType(str, Enum):
     underlined_object = "UNDERLINED_OBJECT"
     linethrough_object = "LINETHROUGH_OBJECT"
     inlinecode_object = "INLINECODE_OBJECT"
-    
+    verbatim_object = "VERBATIM_OBJECT"
 
     def __str__(self):
         return self.value
@@ -875,6 +876,9 @@ class ToolBox:
     object_matchers = {MatcherType.bold_object:BoldObjectMatcher(),
                        MatcherType.italic_object:ItalicObjectMatcher(),
                        MatcherType.underlined_object:UnderlinedObjectMatcher(),
+                       MatcherType.linethrough_object:LineThroughObjectMatcher(),
+                       MatcherType.inlinecode_object:InlineCodeObjectMatcher(),
+                       MatcherType.verbatim_object:VerbatimObjectMatcher(),
                         }
     @classmethod
     def get_matcher_dict(cls):
@@ -908,15 +912,14 @@ class ToolBox:
                                match_line=pos,
                                start_char=match_res['start'],
                                end_char=match_res['end'],
-                               group_dict=matched.groupdict())
+                               matched_contents=matched.groupdict())
                     return res
                 # lesser elements
             pos += 1
         return None
 
     def get_text_and_object_nodes(cls, doc_parser, container, start, end):
-        nodes = []
-        buffer = '\n'.join(doc_parser.lines[start:end +1])
+        buffer = '\n'.join(doc_parser.lines[start:end + 1])
         matches_per_type = {}
         for match_type, matcher in cls.object_matchers.items():
             mres = matcher.match_text(buffer)
@@ -927,24 +930,30 @@ class ToolBox:
             for mitem in matches_per_type[match_type]:
                 mitem['matcher_type'] = match_type
                 by_start[mitem['start']] = mitem
-                last_end = -1
-                
-        order = list(by_start.keys())
-        order.sort()
+
+        order = sorted(by_start.keys())
+        last_end = -1
         for start_pos in order:
             item = by_start[start_pos]
-            if start_pos > last_end:
-                print(f'text from {last_end + 1} to {start_pos - 1}')
-                Text(container.tree_node, buffer[last_end + 1:start_pos - 1])
-            print(f"{item['matcher_type']} from {item['start']} to {item['end']}")
+            if start_pos > last_end + 1:  # Ensure no overlap
+                text_chunk = buffer[last_end + 1:start_pos].strip()
+                if text_chunk:
+                    Text(container.tree_node, text_chunk)
             if item['matcher_type'] == MatcherType.bold_object:
                 BoldText(container.tree_node, item['matched'].groupdict()['text'])
-            if item['matcher_type'] == MatcherType.italic_object:
+            elif item['matcher_type'] == MatcherType.italic_object:
                 ItalicText(container.tree_node, item['matched'].groupdict()['text'])
-            if item['matcher_type'] == MatcherType.underlined_object:
+            elif item['matcher_type'] == MatcherType.underlined_object:
                 UnderlinedText(container.tree_node, item['matched'].groupdict()['text'])
-            
+            elif item['matcher_type'] == MatcherType.linethrough_object:
+                LinethroughText(container.tree_node, item['matched'].groupdict()['text'])
+            elif item['matcher_type'] == MatcherType.inlinecode_object:
+                InlineCodeText(container.tree_node, item['matched'].groupdict()['text'])
+            elif item['matcher_type'] == MatcherType.verbatim_object:
+                VerbatimText(container.tree_node, item['matched'].groupdict()['text'])
             last_end = item['end']
-            
-        
-        
+            # Catch trailing text
+        if last_end + 1 < len(buffer):
+            text_chunk = buffer[last_end + 1:].strip()
+            if text_chunk:
+                Text(container.tree_node, text_chunk)

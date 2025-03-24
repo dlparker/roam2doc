@@ -411,19 +411,11 @@ class InlineCodeText(TextTag):
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
     
-class MonospaceText(Text):
+class VerbatimText(TextTag):
+    tag = '<code>'
 
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
-
-    def to_html(self, indent_level):
-        lines = []
-        indent_level += 1
-        padding, line1 = setup_tag_open(f"span", indent_level, self)
-        line1 += f">{self.text}</span>"
-        lines.append(line1)
-        return lines
-
 
 class Blockquote(Container):
 

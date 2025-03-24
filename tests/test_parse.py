@@ -44,7 +44,7 @@ def test_file_starts_no_content():
         # have exactly empty line at the end, so
         # the end index should, well, you do the math.
         parser = DocParser(contents, name)
-        res = parser.find_section()
+        res = parser.find_first_section()
         assert res.start == 0, f"{name} should start section at 0"
         lines = contents.split('\n')
         x = len(lines) - 1
@@ -59,7 +59,7 @@ def test_file_starts_with_content():
         section_contents_1 = get_frag_file_contents("section_contents_1.org")
         more = contents + section_contents_1
         parser =  DocParser(more, name)
-        res = parser.find_section()
+        res = parser.find_first_section()
         assert res.start == 0, f"{name} should start section at 0"
         lines = more.split('\n')
         x = len(lines) - 1
@@ -146,51 +146,6 @@ def do_list_matcher_test():
     end  = end_matcher.match_line_range(doc_parser, lines, section_p.cursor + 2, len(lines))
     assert end is not None
     assert ToolBox.get_matcher(MatcherType.alist) is not None
-    
-def matcher_test_setup(lines):
-    buff = '\n'.join(lines)
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.find_sections()
-    assert len(doc_parser.sections) == 1
-    section_p = doc_parser.sections[0]
-    pos = 0
-
-    heading_matcher = MatchHeading()
-    hmatch = heading_matcher.match_line(lines[pos])
-    assert hmatch is not None, "Heading matcher failed, direct position"
-    hmatch = heading_matcher.match_line(lines[section_p.cursor])
-    assert hmatch is not None, "Heading matcher failed, position from section cursor"
-    with pytest.raises(Exception):
-        section_parse_tool = heading_matcher.get_parse_tool(doc_parser)
-    # pretend to start the section parser, but don't do it
-    doc_parser.current_section = section_p
-    doc_parser.push_parser(section_p)
-    return doc_parser, section_p
-    
-def test_matchers():
-    do_list_matcher_test()
-
-
-def find_para_blocks(lines, start, end):
-    # caller has stripped the data down to text that does not trigger any element matches.
-    # also guarantees that the first line is not blank
-    pos = start
-    paras = []
-    cur_para = dict(start=pos, end=-1, first_blank=-1, last_blank=-1)
-    paras.append(cur_para)
-    while pos < end:
-        if lines[pos].strip() == '':
-            if cur_para['first_blank'] == -1:
-                cur_para['first_blank'] = pos
-            cur_para['last_blank'] = pos
-        else:
-            if cur_para['first_blank'] != -1:
-                cur_para['end'] = pos - 1
-                cur_para = dict(start=pos, end=-1, first_blank=-1, last_blank=-1)
-                paras.append(cur_para)
-        pos += 1
-    cur_para['end'] = pos - 1
-    return paras
 
 def test_top_lists():
     lines = []
@@ -293,9 +248,12 @@ def test_objects():
     lines.append('* Section 1 heading')
     lines.append('')
     lines.append('Paragraph starts')
-    lines.append("*bold_text* *more_bold_text* *even_more*")
-    lines.append("/italic_text/ /more_italic_text/")
-    lines.append("_underlined_text_ _more_underlined_text_")
+    lines.append("*bold_text* *more_bold_text* *even more but with spaces*")
+    lines.append("/italic_text/ /more_italic_text/ /spaced italic text/")
+    lines.append("_underlined_text_ _more_underlined_text_ _underlined and spaces_")
+    lines.append("+linethrough_text+ +more_linethrough_text+ +spaces in line through+")
+    lines.append("=verbatim_text= =more verbatim text=")
+    lines.append("~code_text~ ~more code text~ ~code containing = sign ~")
     lines.append('')
     buff = '\n'.join(lines)
     
