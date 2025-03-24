@@ -1,5 +1,5 @@
 * A set of python tools for convering org-roam files to a single document
-** someday soon all of the statements below will be true. Currently some are true, some are partly true, some are wishs. Soon now.
+** someday soon all of the statements below will be true. Currently some are true, some are partly true, some are wishes. Soon now.
 - Can parse single or multiple org files, detecting and handling any roam links.
 - Converts parsed org data into a tree structure, which is available for output
    in json format.
