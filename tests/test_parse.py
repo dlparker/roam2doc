@@ -261,6 +261,7 @@ def test_no_elems():
     lines.append('* Section 1 heading')
     lines.append('')
     lines.append('')
+
     lines.append('This will be a paragraph.')
     lines.append('This continues the paragraph.')
     lines.append('The next line (blank) will end the paragraph.')
@@ -285,6 +286,23 @@ def test_no_elems():
     doc_parser.parse()
     print(doc_parser.root.to_html())
     
+
+def test_objects():
+
+    lines = []
+    lines.append('* Section 1 heading')
+    lines.append('')
+    lines.append('Paragraph starts')
+    lines.append("*bold_text* *more_bold_text* *even_more*")
+    lines.append("/italic_text/ /more_italic_text/")
+    lines.append("_underlined_text_ _more_underlined_text_")
+    lines.append('')
+    buff = '\n'.join(lines)
     
+    logger = logging.getLogger("test_code")
+    logger.info("starting test_no_elems")
+    doc_parser = DocParserWrap(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
     
     

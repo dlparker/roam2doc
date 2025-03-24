@@ -382,29 +382,35 @@ class LinkTarget():
         return res
 
 
-class BoldText(Text):
+class TextTag(Text):
 
     def get_css_styles(self):
         return [dict(name="font-weight", value="bold"),]
 
-class ItalicText(Text):
+    def to_html(self, indent_level):
+        indent_level += 1
+        padding, line1 = setup_tag_open(f"{self.tag}", indent_level, self)
+        line1 += f">{self.text}</{self.tag}>"
+        return [line1,]
+    
+class BoldText(TextTag):
+    tag = 'b'
+    
+class ItalicText(TextTag):
+    tag = 'i'
+
+class UnderlinedText(TextTag):
+    tag = 'u'
+
+class LinethroughText(TextTag):
+    tag = 's'
+
+class InlineCodeText(TextTag):
+    tag = '<code>'
 
     def get_css_styles(self):
-        return [dict(name="font-style", value="italic"),]
-
-
-class UnderlinedText(Text):
-
-    def get_css_styles(self):
-        return [dict(name="text-decoration-line", value="underline"),]
-
-
-class LinethroughText(Text):
-
-    def get_css_styles(self):
-        return [dict(name="text-decoration-line", value="line-through"),]
-
-
+        return [dict(name="font-family", value="monospace"),]
+    
 class MonospaceText(Text):
 
     def get_css_styles(self):
@@ -418,14 +424,6 @@ class MonospaceText(Text):
         lines.append(line1)
         return lines
 
-class InlineCodeText(Text):
-
-    def to_html(self, indent_level):
-        lines = []
-        indent_level += 1
-        padding, line1 = setup_tag_open(f"code", indent_level, self)
-        line1 += f">{self.text}</code>"
-        return [line1,]
 
 class Blockquote(Container):
 

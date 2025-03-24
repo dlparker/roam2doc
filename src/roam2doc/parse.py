@@ -239,7 +239,6 @@ class ParseTool:
             p.doc_parser.get_parser_parent(p)
         return p
 
-    
 
 class SectionParse(ParseTool):
 
@@ -255,7 +254,7 @@ class SectionParse(ParseTool):
     def calc_level(self):
         first_line = self.doc_parser.lines[self.start].lstrip()
         if first_line.startswith('*'):
-            last_star = first_line.lstrip().rfind('*') 
+            last_star = first_line.lstrip().rfind('*', re.M) 
             self.level = last_star + 1
             self.heading_text = first_line[last_star + 1:].strip()
             if self.end == self.start:
@@ -362,7 +361,6 @@ class TableParse(ParseTool):
 
                 pos += 1
         return self.end
-            
 
 class ListParse(ParseTool):
 
@@ -554,22 +552,36 @@ class ParagraphParse(ParseTool):
         
     def parse(self):
         parent = self.get_parent_parser()
-        para = Paragraph(parent.tree_node)
+        self.tree_node = para = Paragraph(parent.tree_node)
         last_was_blank = False
         self.logger.debug('Adding paragraph to parser %s', parent)
-        pos = self.start
-        for line in self.doc_parser.lines[self.start:self.end + 1]:
-            pos += 1
-            if line.strip() == "":
-                BlankLine(para)
-                last_was_blank = True
-            else:
-                if last_was_blank:
-                    self.logger.debug('Adding paragraph to parent %s', parent)
-                    para = Paragraph(parent.tree_node)
-                    buff = []
-                    last_was_blank = False
-                Text(para, line.strip())
+        tool_box = ToolBox()
+        start = pos = self.start
+        end = self.end
+        # skip past any leading blank lines
+        any = False
+        while pos < self.end + 1 and not any:
+            for line in self.doc_parser.lines[pos:end + 1]:
+                if line.strip() == "":
+                    BlankLine(parent.tree_node)
+                    pos += 1
+                else:
+                    any = True
+                    break
+            
+        # find all the paragraphs first
+        ranges = []
+        prev = pos
+        while pos < self.end + 1:
+            for line in self.doc_parser.lines[pos:end + 1]:
+                if line.strip() == "":
+                    ranges.append([prev, pos-1])
+                    prev = pos
+                pos += 1
+
+        for r_spec in ranges:
+            tool_box.get_text_and_object_nodes(self.doc_parser, self, r_spec[0], r_spec[1])
+            
         return pos 
 
 class LineRegexMatch:
@@ -603,12 +615,64 @@ class LineRegexMatch:
     def __str__(self):
         return self.__class__.__name__
 
+class ObjectRegexMatch:
+    """ Base class for Matchers that look for org 'objects' withing text,
+    rather than whole line patters. Things such as *bold*.
+    """
+    
+    def __init__(self, patterns):
+        self.patterns = patterns
+
+    def match_text(self, text, first_only=False):
+        matches = []
+        for re in self.patterns:
+            for m in re.finditer(text):
+                matched = dict(start=m.start(),
+                               end=m.end(),
+                               groupdict=m.groupdict(),
+                               matched=m)
+                matches.append(matched)
+        return matches
+
+    def __str__(self):
+        return self.__class__.__name__
+
+class BoldObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'\*(?P<text>.+?)\*'),]
+
+    def __init__(self):
+        super().__init__(self.patterns)
+
+
+class ItalicObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'/(?P<text>.+?)/'),]
+
+    def __init__(self):
+        super().__init__(self.patterns)
+
+class UnderlinedObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'(?<!_)_(?P<text>[^_\s](?:[^_]*[^_\s])?)_(?!_)'),]
+                
+    def __init__(self):
+        super().__init__(self.patterns)
+
+
 class MatchHeading(LineRegexMatch):
     patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
 
     def __init__(self):
         super().__init__(self.patterns)
 
+    def match_line(self, line):
+        res = super().match_line(line)
+        if res:
+            tmp = line.lstrip('*')
+            rest = line.lstrip()[len(line) - len(tmp):]
+            if '*' in rest:
+                # treat it as a regular line containing bold text
+                return None
+        return res
+            
     def get_parse_tool(self):
         return SectionParse
 
@@ -783,6 +847,14 @@ class MatcherType(str, Enum):
     # special cases
     double_blank_line = "DOUBLE_BLANK_LINE"
 
+    # objects
+    bold_object = "BOLD_OBJECT"
+    italic_object = "ITALIC_OBJECT"
+    underlined_object = "UNDERLINED_OBJECT"
+    linethrough_object = "LINETHROUGH_OBJECT"
+    inlinecode_object = "INLINECODE_OBJECT"
+    
+
     def __str__(self):
         return self.value
     
@@ -799,11 +871,17 @@ class ToolBox:
     # lesser elements
     lesser_matchers = {MatcherType.example_block:MatchExample(),
                         }
+    # objects
+    object_matchers = {MatcherType.bold_object:BoldObjectMatcher(),
+                       MatcherType.italic_object:ItalicObjectMatcher(),
+                       MatcherType.underlined_object:UnderlinedObjectMatcher(),
+                        }
     @classmethod
     def get_matcher_dict(cls):
         res = dict(cls.greater_matchers)
         res.update(cls.greater_end_matchers)
         res.update(cls.lesser_matchers)
+        res.update(cls.object_matchers)
         return res
 
     @classmethod
@@ -836,3 +914,37 @@ class ToolBox:
             pos += 1
         return None
 
+    def get_text_and_object_nodes(cls, doc_parser, container, start, end):
+        nodes = []
+        buffer = '\n'.join(doc_parser.lines[start:end +1])
+        matches_per_type = {}
+        for match_type, matcher in cls.object_matchers.items():
+            mres = matcher.match_text(buffer)
+            matches_per_type[match_type] = mres
+
+        by_start = {}
+        for match_type in cls.object_matchers:
+            for mitem in matches_per_type[match_type]:
+                mitem['matcher_type'] = match_type
+                by_start[mitem['start']] = mitem
+                last_end = -1
+                
+        order = list(by_start.keys())
+        order.sort()
+        for start_pos in order:
+            item = by_start[start_pos]
+            if start_pos > last_end:
+                print(f'text from {last_end + 1} to {start_pos - 1}')
+                Text(container.tree_node, buffer[last_end + 1:start_pos - 1])
+            print(f"{item['matcher_type']} from {item['start']} to {item['end']}")
+            if item['matcher_type'] == MatcherType.bold_object:
+                BoldText(container.tree_node, item['matched'].groupdict()['text'])
+            if item['matcher_type'] == MatcherType.italic_object:
+                ItalicText(container.tree_node, item['matched'].groupdict()['text'])
+            if item['matcher_type'] == MatcherType.underlined_object:
+                UnderlinedText(container.tree_node, item['matched'].groupdict()['text'])
+            
+            last_end = item['end']
+            
+        
+        
