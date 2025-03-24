@@ -6,8 +6,9 @@
 6. [ ] Make list items find objects
 7. [ ] Document object parsing limitations, just name what is parsed and where
 8. [ ] Write tests for regex tools
-9. [ ] Consider making all parsers have a prop that reports the tree type it creates. ListParser could have subclasses
-10. [ ] Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
-11. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
-12. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
+9. [ ] Get margin for everthing and figure out how to apply css to duplicate it. Best effort, not everything.
+10. [ ] Consider making all parsers have a prop that reports the tree type it creates. ListParser could have subclasses
+11. [ ] Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
+12. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
+13. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
    

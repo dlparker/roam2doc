@@ -41,6 +41,10 @@ def t2():
     lines.append('')
     lines.append('')
     lines.append('this other text should be in Section 2-2 after list')
+    lines.append('* new top')
+    lines.append('| a | 1 |')
+    lines.append('| b | 2 |')
+    lines.append('| c | 3 |')
     
     buff = '\n'.join(lines)
 

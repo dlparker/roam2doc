@@ -66,7 +66,7 @@ class Root:
                 styles = class_spec['styles']
                 out_lines.append(f".{class_spec['name']}" + " {")
                 for style in styles:
-                    out_lines.append(f"   {style['name']}: {style['value']};")
+                    out_lines.append(f"   {style['name']}: {style['value']} !important;")
                 out_lines.append("}")
             
             out_lines.append("  </style>")
@@ -183,6 +183,7 @@ class Node:
 
     def get_css_styles(self):
         return []
+    
     
 class BlankLine(Node):
     """ This node records the presence of a blank line in the original text. This
@@ -631,9 +632,11 @@ class Table(Container):
     def get_css_styles(self):
         res = []
         res.append(dict(name="table-layout", value="fixed"))
+        res.append(dict(name="margin-left", value="10em"))
         res.append(dict(name="border", value="1px solid black"))
         return res
 
+    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -784,8 +787,11 @@ def setup_tag_open(tag, indent_level, obj):
     line1 = padding
     line1 += f'<{tag} id="obj-{obj.node_id}" '
     classname = f"org-auto-{obj.__class__.__name__}"
-    root.add_css_class(dict(name=classname, styles=obj.get_css_styles()))
-    line1 += f'class="{classname}"'
+    styles = obj.get_css_styles()
+    selector = classname
+    if len(styles) > 0:
+        root.add_css_class(dict(name=selector, styles=obj.get_css_styles()))
+    line1 += f'class="{selector}"'
     return padding, line1
     
 

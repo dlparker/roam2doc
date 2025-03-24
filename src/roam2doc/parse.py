@@ -358,7 +358,7 @@ class TableParse(ParseTool):
                 tr = TableRow(table)
                 for item in line.split('|')[1:-1]:
                     cell = TableCell(tr)
-                    text = Text(tr, item)
+                    text = Text(cell, item)
 
                 pos += 1
         return self.end
