@@ -198,7 +198,8 @@ class BlankLine(Node):
         lines = []
         indent_level += 1
         line1 = " " * indent_level  * 4
-        line1 += "<br>"
+        #line1 += '<span style="margin-bottom: 1em;"> </span>'
+        line1 += '<br>'
         return [line1,]
     
 class Container(Node):

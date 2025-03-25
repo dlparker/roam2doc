@@ -42,6 +42,7 @@ def t2():
     lines.append('This continues the paragraph.')
     lines.append('The next line (blank) will end the paragraph.')
     lines.append('')
+    lines.append('')
     lines.append('This will be a second paragraph. ')
     lines.append('The following blank lines will end it.')
     lines.append('The following next two blank will also be part of the paragraph.')
@@ -95,6 +96,8 @@ def t2():
     lines.append('')
     lines.append('a link [[Section 1 heading][link to section 1 *with some bold text!*]]')
     lines.append('')
+    lines.append('a bad link [[flabist][link to **bad thing!*]]')
+    lines.append('')
     lines.append('last para -1 line 1')
     lines.append('')
     lines.append('last para line 1')
@@ -111,9 +114,13 @@ def t2():
 def t3():
     lines = []
     lines.append('* section 1')
-    lines.append('* section 2')
-    lines.append("<<target>>")
-    lines.append("[[target][link with objects */+bold+/*]]")
+    lines.append('')
+    lines.append('last-1 para line 1')
+    lines.append('')
+    lines.append('last para line 1')
+    lines.append('')
+    #lines.append("<<target>>")
+    #lines.append("[[target][link with objects */+bold+/*]]")
     
     buff = '\n'.join(lines)
 

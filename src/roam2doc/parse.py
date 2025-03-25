@@ -536,14 +536,11 @@ class ParagraphParse(ParseTool):
         
     def parse(self):
         parent = self.get_parent_parser()
-        self.tree_node = para = Paragraph(parent.tree_node)
-        last_was_blank = False
-        self.logger.debug('Adding paragraph to parser %s', parent)
-        tool_box = ToolBox(self.doc_parser)
-        start = pos = self.start
+        pos = self.start
         end = self.end
-        # skip past any leading blank lines
         any = False
+        breaking = False
+        # skip past any leading blank lines
         while pos < self.end + 1 and not any:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if line.strip() == "":
@@ -552,28 +549,60 @@ class ParagraphParse(ParseTool):
                 else:
                     any = True
                     break
-            
+        if pos > self.end:
+            return
+        self.tree_node = para = Paragraph(parent.tree_node)
+        self.logger.debug('Adding paragraph to parser %s', parent)
         # find all the paragraphs first
         ranges = []
-        start_ranges = prev = pos
+        start_pos =  pos
+        prev_end = start_pos - 1 
+        last_was_blank = False
         while pos < self.end + 1:
-            for line in self.doc_parser.lines[start_ranges:end + 1]:
-                if line.strip() == "":
-                    ranges.append([prev, pos-1])
-                    prev = pos
+            for line in self.doc_parser.lines[pos:end + 1]:
+                if breaking and "a link" in line:
+                    breakpoint()
+                if line.strip() != "":
+                    if last_was_blank:
+                        ranges.append([prev_end + 1, pos - 1])
+                        prev_end = pos - 1
+                    last_was_blank = False
+                else:
+                    last_was_blank = True
                 pos += 1
-        if prev == start_ranges and pos == self.end + 1:
-            ranges.append([self.start, self.end])
+        if len(ranges) == 0:
+            # must be a single paragraph
+            ranges.append([start_pos, self.end])
+        elif prev_end < self.end + 1:
+            ranges.append([prev_end, self.end])
 
+        if breaking:
+            for line_sub in self.doc_parser.lines[self.start:self.end]:
+                print(line_sub)
+            for r in ranges:
+                print(r, '---------')
+                for line_sub in self.doc_parser.lines[r[0]: r[1]+1]:
+                    print(line_sub)
+            breakpoint()
+
+        tool_box = ToolBox(self.doc_parser)
         index = 0
         for r_spec in ranges:
             if index > 0:
                 para = Paragraph(parent.tree_node)
             index += 1
+            line_index = r_spec[0]
             for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
-                items = tool_box.get_text_and_object_nodes_in_line(para, line)
-            
-        return pos 
+                if line_index == r_spec[1] and line.strip() == '':
+                    # we do not include blank that ends a paragraph
+                    pass
+                elif line_index < r_spec[1] and line.strip() == '':
+                    # must be more than one blank after paragraph, we honor that
+                    BlankLine(para)
+                else:
+                    items = tool_box.get_text_and_object_nodes_in_line(para, line)
+                line_index += 1
+        return self.end 
 
 class LineRegexMatch:
     """ The structure of this class and its children might look a bit funny,
