@@ -564,7 +564,10 @@ class ParagraphParse(ParseTool):
                 pos += 1
 
         for r_spec in ranges:
-            tool_box.get_text_and_object_nodes(self.doc_parser, self, r_spec[0], r_spec[1])
+            para = Paragraph(parent.tree_node)
+            items = tool_box.get_text_and_object_nodes(self.doc_parser, self, r_spec[0], r_spec[1])
+            for item in items:
+                item.move_to_parent(para)
             
         return pos 
 
