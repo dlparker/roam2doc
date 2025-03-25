@@ -316,7 +316,7 @@ class TableParse(ParseTool):
     def parse(self):
         parent_parser = self.doc_parser.get_parser_parent(self)
         parent_tree_node = parent_parser.tree_node
-        table = Table(parent_tree_node)
+        self.tree_node = table = Table(parent_tree_node)
         tool_box = ToolBox()
         matcher = tool_box.get_matcher(MatcherType.table)
         pos = start_pos = self.start
@@ -332,8 +332,9 @@ class TableParse(ParseTool):
                 tr = TableRow(table)
                 for item in line.split('|')[1:-1]:
                     cell = TableCell(tr)
-                    text = Text(cell, item)
-
+                    content_list = tool_box.get_text_and_object_nodes_in_line(self.doc_parser, self, item)
+                    for citem in content_list:
+                        citem.move_to_parent(cell)
                 pos += 1
         return self.end
 
@@ -467,16 +468,15 @@ class ListParse(ParseTool):
                     pos = parser.parse() + 1
                     self.doc_parser.pop_parser(parser)
                     break
+
+                content_list = tool_box.get_text_and_object_nodes_in_line(self.doc_parser, self, match_res['contents'])
                 if list_type == ListType.ordered_list:
-                    content_list = [Text(the_list, match_res['contents']),]
                     ordinal = match_res['bullet'].rstrip(".").rstrip(')')
                     item = OrderedListItem(the_list, ordinal, content_list)
                 elif list_type == ListType.unordered_list:
-                    content_list = [Text(the_list, match_res['contents']),]
                     item = UnorderedListItem(the_list, content_list)
                 elif list_type == ListType.def_list:
                     title = DefinitionListItemTitle(the_list, match_res['tag'])
-                    content_list = [Text(the_list, match_res['contents']),]
                     desc = DefinitionListItemDescription(the_list, content_list)
                     item = DefinitionListItem(the_list, title, desc)
                 current_item = item
@@ -917,9 +917,13 @@ class ToolBox:
 
     def get_text_and_object_nodes(cls, doc_parser, container, start, end):
         buffer = '\n'.join(doc_parser.lines[start:end + 1])
+        return cls.get_text_and_object_nodes_in_line(doc_parser, container, buffer)
+
+    def get_text_and_object_nodes_in_line(cls, doc_parser, container, line):
+        items = []
         matches_per_type = {}
         for match_type, matcher in cls.object_matchers.items():
-            mres = matcher.match_text(buffer)
+            mres = matcher.match_text(line)
             matches_per_type[match_type] = mres
 
         by_start = {}
@@ -929,28 +933,33 @@ class ToolBox:
                 by_start[mitem['start']] = mitem
 
         order = sorted(by_start.keys())
+        if len(order) == 0:
+            items.append(Text(container.tree_node, line))
+            return items
         last_end = -1
         for start_pos in order:
             item = by_start[start_pos]
             if start_pos > last_end + 1:  # Ensure no overlap
-                text_chunk = buffer[last_end + 1:start_pos].strip()
+                text_chunk = line[last_end + 1:start_pos].strip()
                 if text_chunk:
-                    Text(container.tree_node, text_chunk)
+                    items.append(Text(container.tree_node, text_chunk))
             if item['matcher_type'] == MatcherType.bold_object:
-                BoldText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = BoldText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.italic_object:
-                ItalicText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = ItalicText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.underlined_object:
-                UnderlinedText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = UnderlinedText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.linethrough_object:
-                LinethroughText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = LinethroughText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.inlinecode_object:
-                InlineCodeText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = InlineCodeText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.verbatim_object:
-                VerbatimText(container.tree_node, item['matched'].groupdict()['text'])
+                tree_item = VerbatimText(container.tree_node, item['matched'].groupdict()['text'])
+            items.append(tree_item)
             last_end = item['end']
             # Catch trailing text
-        if last_end + 1 < len(buffer):
-            text_chunk = buffer[last_end + 1:].strip()
+        if last_end + 1 < len(line):
+            text_chunk = line[last_end + 1:].strip()
             if text_chunk:
                 Text(container.tree_node, text_chunk)
+        return items
