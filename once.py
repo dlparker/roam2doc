@@ -1,9 +1,37 @@
 #!/usr/bin/env python
 from pathlib import Path
 import sys
+from pprint import pprint
 sys.path.append(str(Path('./src').resolve()))
                 
-from roam2doc.parse import DocParser
+from roam2doc.parse import DocParser, ToolBox
+
+def t1():
+    lines = []
+    lines.append('* Section 1 heading')
+    lines.append('')
+    lines.append('')
+    lines.append('This will be a paragraph.')
+    lines.append('This continues the paragraph.')
+    lines.append('The next line (blank) will end the paragraph.')
+    lines.append('')
+    lines.append('This will be a second paragraph. ')
+    lines.append('The following blank lines will end it.')
+    lines.append('The following next two blank will also be part of the paragraph.')
+    lines.append('They should be part of the section directly')
+    lines.append('')
+    lines.append('')
+    lines.append('')
+    lines.append('This will be a second paragraph. ')
+    lines.append('* Section 2 heading')
+    lines.append('** Section 3 heading')
+    lines.append('* Section 4 heading')
+
+    buff = '\n'.join(lines)
+
+    doc_parser = DocParser(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
 
 def t2():
     lines = []
@@ -61,9 +89,15 @@ def t2():
     lines.append('    + beebop :: <<arubop>>')
     lines.append('')
     lines.append('')
+    lines.append(' */+bold italic strikethrough+/*')
+    lines.append('')
     lines.append('a link [[paragraph][link to section 1 first line word paragraph]]')
     lines.append('')
-    lines.append('a link [[Section 1 heading][link to section 1]]')
+    lines.append('a link [[Section 1 heading][link to section 1 *with some bold text!*]]')
+    lines.append('')
+    lines.append('last para -1 line 1')
+    lines.append('')
+    lines.append('last para line 1')
     lines.append('')
     
     
@@ -73,27 +107,14 @@ def t2():
     doc_parser.parse()
     print(doc_parser.root.to_html())
 
-def t1():
-    lines = []
-    lines.append('* Section 1 heading')
-    lines.append('')
-    lines.append('')
-    lines.append('This will be a paragraph.')
-    lines.append('This continues the paragraph.')
-    lines.append('The next line (blank) will end the paragraph.')
-    lines.append('')
-    lines.append('This will be a second paragraph. ')
-    lines.append('The following blank lines will end it.')
-    lines.append('The following next two blank will also be part of the paragraph.')
-    lines.append('They should be part of the section directly')
-    lines.append('')
-    lines.append('')
-    lines.append('')
-    lines.append('This will be a second paragraph. ')
-    lines.append('* Section 2 heading')
-    lines.append('** Section 3 heading')
-    lines.append('* Section 4 heading')
 
+def t3():
+    lines = []
+    lines.append('* section 1')
+    lines.append('* section 2')
+    lines.append("<<target>>")
+    lines.append("[[target][link with objects */+bold+/*]]")
+    
     buff = '\n'.join(lines)
 
     doc_parser = DocParser(buff, "inline")

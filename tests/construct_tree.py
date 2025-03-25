@@ -71,15 +71,15 @@ def build_tree_1():
     ulist_section = Section(root.trunk, heading_text="UnorderedList Section")
     ulist1 = UnorderedList(ulist_section)
     bits = [Text(root, "List 1 item u-1"),]
-    uli1 = UnorderedListItem(ulist1, 1, bits)
+    uli1 = UnorderedListItem(ulist1, bits)
     bits = [Text(root, "List 1 item u-2"),]
-    uli2 = UnorderedListItem(ulist1, 1, bits)
+    uli2 = UnorderedListItem(ulist1, bits)
     ulist2 = UnorderedList(uli2)
     bits = [Text(root, "List 1 item u-2-a"),]
-    uli2a = UnorderedListItem(ulist2, 2, bits)
+    uli2a = UnorderedListItem(ulist2, bits)
     ulist2a = UnorderedList(uli2a)
     bits = [Text(root, "List 1 item u-2-a-1"),]
-    uli2a1 = UnorderedListItem(ulist2a, 3, bits)
+    uli2a1 = UnorderedListItem(ulist2a, bits)
 
     dlist_section = Section(root.trunk, heading_text="DictionaryList Section")
     dlist1 = DefinitionList(dlist_section)
@@ -88,7 +88,7 @@ def build_tree_1():
     # because that could happen!
     bits = [Text(root, "DictDesc1 start "),  TargetText(root, "Target 2"), Text(root, "DictDescEnd")]
     dli1_desc = DefinitionListItemDescription(dlist1, bits)
-    dli1_item = DefinitionListItem(dlist1, 1, dli1_title, dli1_desc)
+    dli1_item = DefinitionListItem(dlist1, dli1_title, dli1_desc)
 
     dli2_title = DefinitionListItemTitle(dlist1, "DicTitleTheSecond")
     # make a descripion with multiple text items and a TargetText
@@ -96,7 +96,7 @@ def build_tree_1():
     bits = [Text(root, "What a boring definition."),
             Text(root, "It just goes on and on.")]
     dli2_desc = DefinitionListItemDescription(dlist1, bits)
-    dli2_item = DefinitionListItem(dlist1, 1,  dli2_title, dli2_desc)
+    dli2_item = DefinitionListItem(dlist1, dli2_title, dli2_desc)
     
     table_section = Section(root.trunk, heading_text="Table Section")
     table1 = Table(table_section)

@@ -1,14 +1,15 @@
 1. [X] Make list parse handing paras in items
 2. [X] Move all regexp to matchers
 3. [X] Change all explicit Matcher instantiations to a call to tool_box
-4. [ ] Make Paras find objects
-5. [ ] Make Tables find objects
-6. [ ] Make list items find objects
+4. [X] Make Paras find objects
+5. [X] Make Tables find objects
+6. [X] Make list items find objects
 7. [ ] Document object parsing limitations, just name what is parsed and where
-   1. bold text not allowed in headings, heading will be converted to regular/bold text
-   2. verbatim strings (=string=) cannot contain =, use ~ for that if you need it
-   3. nested definition lists are not nested when converted to html. Some controversy on what is right
-   4. nested object sytax is not supported. e.g. <<*bold_target*>> will probably produce the words "bold target" in both forms on output
+   1. Bold text not allowed in headings, heading will be converted to regular/bold text
+   2. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
+   3. Nested definition lists are not nested when converted to html. Some controversy on what is right
+   4. Nested object syntax is not supported. e.g. <<*bold_target*>> will probably produce the words "bold target" in both forms on output
+   5. Nested object syntax in link descrption (second) part is not currently supported. Might someday, maybe
 8. [ ] Write tests for regex tools
 9. [ ] Get margin for everthing and figure out how to apply css to duplicate it. Best effort, not everything.
 10. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback

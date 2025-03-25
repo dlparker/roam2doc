@@ -214,6 +214,13 @@ class Container(Node):
         if node not in self.children:
             self.children.append(node)
         
+    def remove_node(self, node):
+        try:
+            index = self.children.index(node)
+            self.children.pop(index)
+        except ValueError:
+            pass
+        
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -382,16 +389,29 @@ class LinkTarget():
         return res
 
 
-class TextTag(Text):
+class TextTag(Container):
 
+    def __init__(self, parent, simple_text=None, content=None):
+        super().__init__(parent, content)
+        self.simple_text = simple_text
+    
     def get_css_styles(self):
         return [dict(name="font-weight", value="bold"),]
 
     def to_html(self, indent_level):
+        lines = []
         indent_level += 1
         padding, line1 = setup_tag_open(f"{self.tag}", indent_level, self)
-        line1 += f">{self.text}</{self.tag}>"
-        return [line1,]
+        if self.simple_text:
+            line1 += f">{self.simple_text}</{self.tag}>"
+            lines.append(line1)
+            return lines
+        line1 += ">"
+        lines.append(line1)
+        for node in self.children:
+            lines.extend(node.to_html(indent_level))
+        lines.append(padding + f"</{self.tag}>")
+        return lines
     
 class BoldText(TextTag):
     tag = 'b'
@@ -418,7 +438,6 @@ class VerbatimText(TextTag):
         return [dict(name="font-family", value="monospace"),]
 
 class Blockquote(Container):
-
 
     def __init__(self, parent, cite=None, content=None):
         super().__init__(parent)
@@ -690,6 +709,9 @@ class Link(Container):
         lines.append(line1)
         if self.display_text:
             lines.append(padding + "   " + self.display_text)
+        elif len(self.children) > 0:
+            for child in self.children:
+                lines.extend(child.to_html())
         lines.append(padding + '</a>')
         return lines
 
@@ -719,19 +741,21 @@ class InternalLink(Link):
         target = self.find_target()
         if not target:
             padding, line1 = setup_tag_open("span", indent_level, self)
-            line1 += f'>{self.display_text}</span>'
-            line1 += '<span style="color: red; font-style: italic; font-weight: bold;">'
-            line1 += " !!! link target not found !!!"
+            line1 += 'style="color: red; font-style: italic; font-weight: bold;">'
+            line1 += f' !!! link target "{self.target_text}" not found !!!'
             line1 += "</span>"
             lines.append(line1)
             return lines
         padding, line1 = setup_tag_open("a", indent_level, self)
+        line1 += f' href="#obj-{target.node_id}">'
         if self.display_text:
             display_text = self.display_text
-        else:
-            display_text = target_text
-        line1 += f' href="#obj-{target.node_id}">{display_text}</a>'
+            line1 += f'{display_text}</a>'
         lines.append(line1)
+        if len(self.children) > 0:
+            for child in self.children:
+                lines.extend(child.to_html(indent_level))
+            lines.append(padding + '</a>')
         return lines
 
     def to_json_dict(self):

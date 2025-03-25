@@ -1,6 +1,7 @@
 import re
 import logging
 import typing
+from collections import defaultdict
 from enum import Enum
 from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
@@ -66,7 +67,7 @@ class DocParser:
         heading_text = None
         # if the first line is not a heading, then we don't have one,
         # we have a zeroth section with no heading
-        tool_box = ToolBox()
+        tool_box = ToolBox(self)
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
         elem = heading_matcher.match_line(self.lines[pos])
         if elem:
@@ -114,11 +115,11 @@ class DocParser:
                          first_section.start,
                          first_section.end,
                          len(self.lines))
-        tool_box = ToolBox()
+        tool_box = ToolBox(self)
         pos = start_offset + 1
         starts = []
         while pos < len(self.lines):
-            elem  = tool_box.next_greater_element(self, pos, len(self.lines))
+            elem  = tool_box.next_greater_element(pos, len(self.lines))
             if elem is None:
                 break
             pos = elem['match_line']
@@ -144,7 +145,7 @@ class DocParser:
                         section.end,
                         len(self.lines))
             self.sections.append(section)
-        
+            
     def parse(self):
         self.find_top_sections()
         index = 0
@@ -264,13 +265,13 @@ class SectionParse(ParseTool):
         if self.properties:
             self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
             pos += len(self.properties) + 2
-        tool_box = ToolBox()
+        tool_box = ToolBox(self.doc_parser)
         # now find all greater elements
-        last_sub_start = pos
-        last_sub_end = pos 
+        last_sub_start = pos - 1
+        last_sub_end = pos - 1
         gaps = []
         while pos < self.end + 1:
-            elem  = tool_box.next_greater_element(self.doc_parser, pos, self.end)
+            elem  = tool_box.next_greater_element(pos, self.end)
             if elem:
                 self.logger.debug('%s found inner element %s at %d', str(self),
                                   elem['match_type'],
@@ -280,7 +281,7 @@ class SectionParse(ParseTool):
                 if match_pos > last_sub_end:
                     para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1)
                     self.doc_parser.push_parser(para)
-                    para.parse() + 1
+                    para.parse()
                     self.doc_parser.pop_parser(para)
                 parser = parse_tool(self.doc_parser, match_pos, self.end)
                 self.doc_parser.push_parser(parser)
@@ -292,7 +293,9 @@ class SectionParse(ParseTool):
                 last_sub_end = sub_end
             else:
                 # no more elements in range, so make a para
-                if last_sub_end < self.end + 1:
+                if last_sub_end < self.end:
+                    self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
+                                      last_sub_end + 1, self.end)
                     para = ParagraphParse(self.doc_parser, last_sub_end + 1, self.end)
                     self.doc_parser.push_parser(para)
                     para.parse()
@@ -315,13 +318,13 @@ class TableParse(ParseTool):
         parent_parser = self.doc_parser.get_parser_parent(self)
         parent_tree_node = parent_parser.tree_node
         self.tree_node = table = Table(parent_tree_node)
-        tool_box = ToolBox()
+        tool_box = ToolBox(self.doc_parser)
         matcher = tool_box.get_matcher(MatcherType.table)
         pos = start_pos = self.start
         short_id = f"Table@{start_pos}"
         while pos < self.end + 1:
             for line in self.doc_parser.lines[pos:self.end + 1]:
-                next_elem = tool_box.next_greater_element(self.doc_parser, pos, self.end)
+                next_elem = tool_box.next_greater_element(pos, self.end)
                 if not next_elem:
                     return pos - 1
                 if next_elem['match_type'] != MatcherType.table:
@@ -330,7 +333,7 @@ class TableParse(ParseTool):
                 tr = TableRow(table)
                 for item in line.split('|')[1:-1]:
                     cell = TableCell(tr)
-                    content_list = tool_box.get_text_and_object_nodes_in_line(self.doc_parser, self, item)
+                    content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node, item)
                     for citem in content_list:
                         citem.move_to_parent(cell)
                 pos += 1
@@ -344,8 +347,7 @@ class ListParse(ParseTool):
         self.start_value = None
         self.margin = 0
         self.spaces_per_level = 0
-        tool_box = ToolBox()
-        list_matcher = tool_box.get_matcher(MatcherType.alist)
+        list_matcher = ToolBox.get_matcher(MatcherType.alist)
         self.regexps = {
             ListType.unordered_list: list_matcher.get_compiled_regex(ListType.unordered_list),
             ListType.ordered_list:  list_matcher.get_compiled_regex(ListType.ordered_list),
@@ -410,7 +412,7 @@ class ListParse(ParseTool):
         self.logger.info(self.match_log_format, short_id, "List", line)
         self.logger.info("%15s %12s created item %s at level %d", short_id, '', the_list, my_start_level)
         self.logger.info("%15s %12s created item %s", short_id, '', item)
-        tool_box = ToolBox()
+        tool_box = ToolBox(self.doc_parser)
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
         blank_count = 0
         para_lines = []
@@ -467,7 +469,7 @@ class ListParse(ParseTool):
                     self.doc_parser.pop_parser(parser)
                     break
 
-                content_list = tool_box.get_text_and_object_nodes_in_line(self.doc_parser, self, match_res['contents'])
+                content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node, match_res['contents'])
                 if list_type == ListType.ordered_list:
                     ordinal = match_res['bullet'].rstrip(".").rstrip(')')
                     item = OrderedListItem(the_list, ordinal, content_list)
@@ -537,7 +539,7 @@ class ParagraphParse(ParseTool):
         self.tree_node = para = Paragraph(parent.tree_node)
         last_was_blank = False
         self.logger.debug('Adding paragraph to parser %s', parent)
-        tool_box = ToolBox()
+        tool_box = ToolBox(self.doc_parser)
         start = pos = self.start
         end = self.end
         # skip past any leading blank lines
@@ -553,19 +555,23 @@ class ParagraphParse(ParseTool):
             
         # find all the paragraphs first
         ranges = []
-        prev = pos
+        start_ranges = prev = pos
         while pos < self.end + 1:
-            for line in self.doc_parser.lines[pos:end + 1]:
+            for line in self.doc_parser.lines[start_ranges:end + 1]:
                 if line.strip() == "":
                     ranges.append([prev, pos-1])
                     prev = pos
                 pos += 1
+        if prev == start_ranges and pos == self.end + 1:
+            ranges.append([self.start, self.end])
 
+        index = 0
         for r_spec in ranges:
-            para = Paragraph(parent.tree_node)
-            items = tool_box.get_text_and_object_nodes(self.doc_parser, self, r_spec[0], r_spec[1])
-            for item in items:
-                item.move_to_parent(para)
+            if index > 0:
+                para = Paragraph(parent.tree_node)
+            index += 1
+            for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
+                items = tool_box.get_text_and_object_nodes_in_line(para, line)
             
         return pos 
 
@@ -828,8 +834,8 @@ class MatchGreaterEnd:
     
     def match_line_range(self, doc_parser, lines, start, end):
         pos = start
-        tool_box = ToolBox()
-        next_elem = tool_box.next_greater_element(doc_parser, pos, end)
+        tool_box = ToolBox(self.doc_parser)
+        next_elem = tool_box.next_greater_element(pos, end)
         return next_elem
 
 
@@ -907,14 +913,17 @@ class ToolBox:
         d = cls.get_matcher_dict()
         return d.get(typename, None)
 
-    def next_greater_element(cls, doc_parser, start, end):
+    def __init__(self, doc_parser):
+        self.doc_parser = doc_parser
+        
+    def next_greater_element(self, start, end):
         """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
         things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
         pos = start
         logger = logging.getLogger('roam2doc-parser')
-        for line in doc_parser.lines[start:end+1]:
+        for line in self.doc_parser.lines[start:end+1]:
             # greater elements
-            for match_type, matcher in cls.greater_matchers.items():
+            for match_type, matcher in self.greater_matchers.items():
                 match_res = matcher.match_line(line)
                 if match_res:
                     logger.debug("matched %s at line %d", match_type, pos)
@@ -932,57 +941,101 @@ class ToolBox:
             pos += 1
         return None
 
-    def get_text_and_object_nodes(cls, doc_parser, container, start, end):
-        buff = '\n'.join(doc_parser.lines[start:end + 1])
-        return cls.get_text_and_object_nodes_in_line(doc_parser, container, buff)
+    def get_text_and_object_nodes_in_line(self, tree_node, line):
+        blocks_by_offset = {}
 
-    def get_text_and_object_nodes_in_line(cls, doc_parser, container, line):
-        items = []
         matches_per_type = {}
-        for match_type, matcher in cls.object_matchers.items():
+        for match_type, matcher in self.object_matchers.items():
             mres = matcher.match_text(line)
             matches_per_type[match_type] = mres
 
-        by_start = {}
-        for match_type in cls.object_matchers:
+        for match_type in self.object_matchers:
             for mitem in matches_per_type[match_type]:
                 mitem['matcher_type'] = match_type
-                by_start[mitem['start']] = mitem
+                blocks_by_offset[mitem['start']] = mitem
 
-        order = sorted(by_start.keys())
-        if len(order) == 0:
-            items.append(Text(container.tree_node, line))
+        # find overlaps. objects can contain other objects, e.g. <<*bold*>>
+        items = []
+        tmp = list(blocks_by_offset.keys())
+        if len(tmp) == 0:
+            items.append(Text(tree_node, line))
             return items
+        tmp.sort()
+        pos = tmp[0]
+        by_start = {}
+        block_id_pos = 0
+        last_block = None
+        while block_id_pos < len(tmp):
+            pos = tmp[block_id_pos]
+            block = blocks_by_offset[pos]
+            if last_block and last_block['end'] > block['end']:
+                block_id_pos += 1
+                continue
+            self.fold_inner(pos, blocks_by_offset)
+            by_start[pos] = block
+            block_id_pos += 1
+            last_block = block
+        order = sorted(by_start.keys())
         last_end = -1
-        for start_pos in order:
-            item = by_start[start_pos]
-            if start_pos > last_end + 1:
-                text_chunk = line[last_end + 1:start_pos].strip()
+        for pos,item in by_start.items():
+            if pos > last_end + 1:
+                text_chunk = line[last_end + 1:pos].strip()
                 if text_chunk:
-                    items.append(Text(container.tree_node, text_chunk))
-            if item['matcher_type'] == MatcherType.bold_object:
-                tree_item = BoldText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.italic_object:
-                tree_item = ItalicText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.underlined_object:
-                tree_item = UnderlinedText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.linethrough_object:
-                tree_item = LinethroughText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.inlinecode_object:
-                tree_item = InlineCodeText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.verbatim_object:
-                tree_item = VerbatimText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.target_object:
-                tree_item = TargetText(container.tree_node, item['matched'].groupdict()['text'])
-            elif item['matcher_type'] == MatcherType.internal_link_object:
-                target_text = item['matched'].groupdict()['pathreg']
-                display_text = item['matched'].groupdict()['description']
-                tree_item = InternalLink(container.tree_node, target_text, display_text)
-            items.append(tree_item)
+                    items.append(Text(tree_node, text_chunk))
+            items.append(self.do_object_parts(item, tree_node))
             last_end = item['end']
-            # Catch trailing text
         if last_end + 1 < len(line):
             text_chunk = line[last_end + 1:].strip()
             if text_chunk:
-                Text(container.tree_node, text_chunk)
+                Text(tree_node, text_chunk)
         return items
+
+    def fold_inner(self, pos, blocks_by_offset):
+        block = blocks_by_offset[pos]
+        start = block['start']
+        inner = []
+        next_pos = start + 1
+        inner_block = blocks_by_offset.get(next_pos, None)
+        if inner_block:
+            inner.append(inner_block)
+            self.fold_inner(next_pos, blocks_by_offset)
+            block['inner_objects'] = inner
+        
+    def do_object_parts(self, item, tree_node):
+        simple_text = None
+        if "inner_objects" not in item:
+            if item['matcher_type'] != MatcherType.internal_link_object:
+                simple_text = item['matched'].groupdict()['text']
+        tree_item = self.add_object_item(tree_node, item, simple_text)
+        if "inner_objects" not in item:
+            return tree_item
+        if "inner_objects" in item:
+            for in_item in item['inner_objects']:
+                self.do_object_parts(in_item, tree_item)
+        return tree_item
+        
+    def add_object_item(self, tree_node, item, simple_text=None):
+        if item['matcher_type'] == MatcherType.bold_object:
+            tree_item = BoldText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.italic_object:
+            tree_item = ItalicText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.underlined_object:
+            tree_item = UnderlinedText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.linethrough_object:
+            tree_item = LinethroughText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.inlinecode_object:
+            tree_item = InlineCodeText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.verbatim_object:
+            tree_item = VerbatimText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.target_object:
+            tree_item = TargetText(tree_node, simple_text)
+        elif item['matcher_type'] == MatcherType.internal_link_object:
+            target_text = item['matched'].groupdict()['pathreg']
+            desc = item['matched'].groupdict()['description']
+            tree_item = InternalLink(tree_node, target_text, None)
+            items = self.get_text_and_object_nodes_in_line(tree_item, desc)
+            if len(items) == 1:
+                tree_item.display_text = desc
+                tree_item.remove_node(items[0])
+        return tree_item
+        
