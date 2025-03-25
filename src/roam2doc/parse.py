@@ -659,6 +659,18 @@ class VerbatimObjectMatcher(ObjectRegexMatch):
     def __init__(self):
         super().__init__(self.patterns)
         
+class TargetObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'<<(?P<text>.+?)>>'),]
+
+    def __init__(self):
+        super().__init__(self.patterns)
+        
+class InternalLinkObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'\[\[(?P<pathreg>.+?)?\]\[(?P<description>.+?)?\]\]'),]
+    
+    def __init__(self):
+        super().__init__(self.patterns)
+        
 class MatchHeading(LineRegexMatch):
     patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
 
@@ -852,6 +864,8 @@ class MatcherType(str, Enum):
     linethrough_object = "LINETHROUGH_OBJECT"
     inlinecode_object = "INLINECODE_OBJECT"
     verbatim_object = "VERBATIM_OBJECT"
+    target_object = "TARGET_OBJECT"
+    internal_link_object = "INTERNAL_LINK_OBJECT"
 
     def __str__(self):
         return self.value
@@ -876,7 +890,9 @@ class ToolBox:
                        MatcherType.linethrough_object:LineThroughObjectMatcher(),
                        MatcherType.inlinecode_object:InlineCodeObjectMatcher(),
                        MatcherType.verbatim_object:VerbatimObjectMatcher(),
-                        }
+                       MatcherType.target_object:TargetObjectMatcher(),
+                       MatcherType.internal_link_object:InternalLinkObjectMatcher(),
+                       }
     @classmethod
     def get_matcher_dict(cls):
         res = dict(cls.greater_matchers)
@@ -916,8 +932,8 @@ class ToolBox:
         return None
 
     def get_text_and_object_nodes(cls, doc_parser, container, start, end):
-        buffer = '\n'.join(doc_parser.lines[start:end + 1])
-        return cls.get_text_and_object_nodes_in_line(doc_parser, container, buffer)
+        buff = '\n'.join(doc_parser.lines[start:end + 1])
+        return cls.get_text_and_object_nodes_in_line(doc_parser, container, buff)
 
     def get_text_and_object_nodes_in_line(cls, doc_parser, container, line):
         items = []
@@ -939,7 +955,7 @@ class ToolBox:
         last_end = -1
         for start_pos in order:
             item = by_start[start_pos]
-            if start_pos > last_end + 1:  # Ensure no overlap
+            if start_pos > last_end + 1:
                 text_chunk = line[last_end + 1:start_pos].strip()
                 if text_chunk:
                     items.append(Text(container.tree_node, text_chunk))
@@ -955,6 +971,12 @@ class ToolBox:
                 tree_item = InlineCodeText(container.tree_node, item['matched'].groupdict()['text'])
             elif item['matcher_type'] == MatcherType.verbatim_object:
                 tree_item = VerbatimText(container.tree_node, item['matched'].groupdict()['text'])
+            elif item['matcher_type'] == MatcherType.target_object:
+                tree_item = TargetText(container.tree_node, item['matched'].groupdict()['text'])
+            elif item['matcher_type'] == MatcherType.internal_link_object:
+                target_text = item['matched'].groupdict()['pathreg']
+                display_text = item['matched'].groupdict()['description']
+                tree_item = InternalLink(container.tree_node, target_text, display_text)
             items.append(tree_item)
             last_end = item['end']
             # Catch trailing text
