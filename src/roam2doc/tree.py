@@ -702,7 +702,6 @@ class Link(Container):
         res = dict(cls=superres['cls'], props=lres)
         return res
 
-
 class InternalLink(Link):
 
     def __init__(self, *args, **argv):

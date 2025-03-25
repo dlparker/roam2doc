@@ -229,11 +229,9 @@ class SectionParse(ParseTool):
     def calc_level(self):
         first_line = self.doc_parser.lines[self.start].lstrip()
         if first_line.startswith('*'):
-            last_star = first_line.lstrip().rfind('*', re.M) 
+            last_star = first_line.lstrip().rfind('*')
             self.level = last_star + 1
             self.heading_text = first_line[last_star + 1:].strip()
-            if self.end == self.start:
-                return True
             return True
         # We don't have an actual heading, just start of file.
         # We need to figure out some kind of text for a heading, cause

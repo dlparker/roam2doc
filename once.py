@@ -63,6 +63,8 @@ def t2():
     lines.append('')
     lines.append('a link [[paragraph][link to section 1 first line word paragraph]]')
     lines.append('')
+    lines.append('a link [[Section 1 heading][link to section 1]]')
+    lines.append('')
     
     
     buff = '\n'.join(lines)
