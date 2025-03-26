@@ -309,3 +309,24 @@ def test_def_list_2():
     doc_parser.parse()
     print(doc_parser.root.to_html())
     
+def test_nest_list():
+    lines = []
+    lines.append('+ level 1 item 1')
+    lines.append('+ level 1 item 2')
+    lines.append('  + level 2 item 1')
+    lines.append('    + level 3 item 1')
+    lines.append('      + level 4 item 1')
+    lines.append('    + level 3 item 2')
+    lines.append('  + level 2 item 2')
+    lines.append('+ level 1 item 3')
+    lines.append('')
+    lines.append('')
+    buff = '\n'.join(lines)
+    
+    logger = logging.getLogger("test_code")
+    logger.info("starting test_no_elems")
+    doc_parser = DocParserWrap(buff, "inline")
+    doc_parser.parse()
+    #print(json.dumps(doc_parser.root.to_json_dict(), indent=2))
+    print(doc_parser.root.to_html())
+    

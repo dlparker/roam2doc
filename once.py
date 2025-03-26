@@ -76,6 +76,7 @@ def t2():
     lines.append('| a | *1 bold item* |')
     lines.append('| b | /2 italian items/ |')
     lines.append('| c | +3 other items+ |')
+    lines.append('| d | a link inside a cell! ->[[Section 2 heading][see: section 2]] |')
     lines.append('')
     lines.append('')
     lines.append('* a section')
@@ -122,6 +123,22 @@ def t3():
     #lines.append("<<target>>")
     #lines.append("[[target][link with objects */+bold+/*]]")
     
+    buff = '\n'.join(lines)
+
+    doc_parser = DocParser(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
+
+def t4():
+    lines = []
+    lines.append('+ level 1 item 1')
+    lines.append('+ level 1 item 2')
+    lines.append('  + level 2 item 1')
+    lines.append('    + level 3 item 1')
+    lines.append('      + level 4 item 1')
+    lines.append('    + level 3 item 2')
+    lines.append('  + level 2 item 2')
+    lines.append('+ level 1 item 3')
     buff = '\n'.join(lines)
 
     doc_parser = DocParser(buff, "inline")

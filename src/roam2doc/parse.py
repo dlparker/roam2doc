@@ -354,138 +354,159 @@ class ListParse(ParseTool):
             ListType.def_list:  list_matcher.get_compiled_regex(ListType.def_list),
         }
 
-
     def parse(self):
+        # first find the limits of the outer list
         parent_parser = self.doc_parser.get_parser_parent(self)
         pos = self.start
         end = self.end
-        short_id = f"List@{pos}"
-        # we know we are on the first line of a list, so
-        # figure out wnat kind and initialize it.
-        line = self.doc_parser.lines[pos]
-        matcher = MatchList()
-        match_res = self.list_line_get_type(line)
-        if match_res is None:
-            # we are going to follow the rule of ignoring text that confuses
-            # us, just record the problem
-            problem = dict(description="List parser called with first line that is not a list item",
-                           problem_line_pos=pos, problem_line=line)
-            self.doc_parser.record_parse_problem(problem)
-            return
-        # This will be the margin for all list items, so the
-        # depth calculation needs to subtract this first
-        parent = self.get_parent_parser()
-        tree_parent = parent_parser.tree_node
-        if isinstance(parent, ListParse):
-            self.margin = parent.margin
-            self.spaces_per_level = parent.spaces_per_level
-            my_start_level = 1
-            tmp = parent
-            while tmp and isinstance(tmp, ListParse):
-                my_start_level += 1
-                tmp = tmp.get_parent_parser()
-        else:
-            self.margin = margin = match_res['lindent']
-            my_start_level = 1
-        self.list_type = list_type = match_res['list_type']
-        if isinstance(parent, ListParse):
-            parent_list = parent_parser.tree_node
-            parent_last_item = parent_list.children[-1]
-            tree_parent = parent_last_item
-        if list_type == ListType.ordered_list:
-            the_list = OrderedList(parent=tree_parent, margin=self.margin)
-            content_list = [Text(the_list, match_res['contents']),]
-            ordinal = match_res['bullet'].rstrip(".").rstrip(')')
-            item = OrderedListItem(the_list, ordinal, content_list)
-        elif list_type == ListType.unordered_list:
-            the_list = UnorderedList(parent=tree_parent, margin=self.margin)
-            content_list = [Text(the_list, match_res['contents']),]
-            item = UnorderedListItem(the_list, content_list)
-        elif list_type == ListType.def_list:
-            the_list = DefinitionList(parent=tree_parent, margin=self.margin)
-            title = DefinitionListItemTitle(the_list, match_res['tag'])
-            content_list = [Text(the_list, match_res['contents']),]
-            desc = DefinitionListItemDescription(the_list, content_list)
-            item = DefinitionListItem(the_list, title, desc)
-        # unless self.list_line_get_type(line) is broken, one of the above MUST match
-        self.tree_node = the_list
-        self.logger.info(self.match_log_format, short_id, "List", line)
-        self.logger.info("%15s %12s created item %s at level %d", short_id, '', the_list, my_start_level)
-        self.logger.info("%15s %12s created item %s", short_id, '', item)
+        self.short_id = fr"List\@{pos}"
+        # To begin, iterate over the lines looking for the end of the outer list
+        # that means two blanks, a heading, or end of section
         tool_box = ToolBox(self.doc_parser)
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
         blank_count = 0
-        para_lines = []
         pos += 1
-        current_item = item
-        level = my_start_level
-        while pos < end + 1:
-            for line in self.doc_parser.lines[pos:end + 1]:
-                if heading_matcher.match_line(line):
-                    self.logger.info(self.match_log_format, short_id, str(matcher), line)
-                    if len(item.para_lines) > 0:
-                        self.handle_item_para(item)
-                    return pos - 1
-                if line.strip() == '':
-                    blank_count += 1
-                    if blank_count == 2:
-                        if len(item.para_lines) > 0:
-                            self.handle_item_para(item)
-                        if isinstance(parent, ListParse):
-                            return pos - 2
-                        BlankLine(item)
-                        BlankLine(item)
-                        return pos
-                    pos += 1
+        list_end = self.end
+        for line in self.doc_parser.lines[pos:self.end]:
+            if heading_matcher.match_line(line):
+                list_end = pos
+                break
+            if line.strip() == '':
+                blank_count += 1
+                if blank_count == 2:
+                    list_end = pos
                     break
-                elif blank_count:
-                    blank_count -= 1
-                match_res = self.list_line_get_type(line)
-                if match_res is None:
-                    current_item.para_lines.append(pos)
-                    pos += 1
-                    break
-                self.logger.info(self.match_log_format, short_id, str(matcher), line)
-                if self.spaces_per_level != 0:
-                    level = int(match_res['lindent'] / self.spaces_per_level) + 1
-                    self.logger.debug("List left indent spaces %d gives level %d", match_res['lindent'], level) 
+            else:
+                blank_count = 0
+            pos += 1
+        self.list_start = self.start
+        self.list_end = list_end
+        # We know we are on the first line of a list, so
+        # figure out wnat kind and get our margin
+        line = self.doc_parser.lines[self.start]
+        first_match_res = self.list_line_get_type(line)
+        self.margin = margin = first_match_res['lindent']
+        # now look at them all again and see if there are any list items that have
+        # an indent greater than ours, that will give us the spaces_per_level value
+        spaces_per_level = None
+        # a dict of the line matches indexed by line number
+        item_records = {}
+        
+        pos = self.start
+        for line in self.doc_parser.lines[pos:self.list_end + 1]:
+            match_res = self.list_line_get_type(line)
+            if match_res:
+                self.logger.info(self.match_log_format, self.short_id, "List", line)
+                item_records[pos] = match_res
+                if pos == self.start:
+                    match_res['prev_input_line'] = -1
                 else:
-                    if match_res['lindent'] > self.margin:
-                        # this line is indented beyond first so we can calc the
-                        # indent to level ratio
-                        self.spaces_per_level = match_res['lindent'] - self.margin
-                        level = 2
-                        self.logger.debug("List indent spaces per level calculated to be %d", self.spaces_per_level)
-                if level < my_start_level:
-                    self.logger.debug("List parser returning at pos %d", pos - 1)
-                    return pos - 1
-                if match_res['list_type'] != list_type or level > my_start_level:
-                    self.logger.debug("Processing sub list of type %s at pos  %d", match_res['list_type'], pos)
-                    if len(item.para_lines) > 0:
-                        self.handle_item_para(item)
-                    parser = ListParse(self.doc_parser, pos, self.end)
-                    self.doc_parser.push_parser(parser)
-                    pos = parser.parse() + 1
-                    self.doc_parser.pop_parser(parser)
-                    break
+                    match_res['prev_input_line'] = last_match_pos
+                last_match_pos = pos
+                if match_res['lindent'] > self.margin and spaces_per_level is None:
+                    # this line is indented beyond first so we can calc the
+                    # indent to level ratio
+                    spaces_per_level = match_res['lindent'] - self.margin
+            pos += 1
+        if spaces_per_level is not None:
+            self.spaces_per_level = spaces_per_level
+            self.list_is_flat = False
+        else:
+            self.list_is_flat = False
 
-                content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node, match_res['contents'])
-                if list_type == ListType.ordered_list:
-                    ordinal = match_res['bullet'].rstrip(".").rstrip(')')
-                    item = OrderedListItem(the_list, ordinal, content_list)
-                elif list_type == ListType.unordered_list:
-                    item = UnorderedListItem(the_list, content_list)
-                elif list_type == ListType.def_list:
-                    title = DefinitionListItemTitle(the_list, match_res['tag'])
-                    desc = DefinitionListItemDescription(the_list, content_list)
-                    item = DefinitionListItem(the_list, title, desc)
-                current_item = item
-                self.logger.debug("%15s %12s created item %s", short_id, '', item)
-                pos += 1
-        if len(item.para_lines) > 0:
-            self.handle_item_para(item)
-        return pos 
+
+        # We now have a picture of where the list items are. We still don't
+        # know if they are all of the same type, or what level they have, or
+        # what content they have. Figure out these.
+        # Ensure we have a list of the list item line positions in ascending order
+        order = list(item_records.keys())
+        order.sort()
+        # start on the second one, find gaps between each
+        
+        last_line_pos = order[0]
+        for loc_index in range(0, len(order)):
+            line_pos = order[loc_index]
+            if line_pos > last_line_pos + 1:
+                item_records[last_line_pos]['last_content_line'] = line_pos - 1
+            rec = item_records[line_pos]
+            rec['changes_type'] = rec['list_type'] != first_match_res['list_type']
+            if self.spaces_per_level is not None and rec['lindent'] > self.margin:
+                rec['level'] = int((rec['lindent'] - self.margin) / self.spaces_per_level) + 1 
+            else:
+                rec['level'] = 1
+        cur_list = self.make_level_nodes(parent_parser.tree_node, order[0], item_records)
+        return self.list_end
                 
+    def make_level_nodes(self, parent_tree_item, record_pos, item_records):
+        my_rec = item_records[record_pos]
+        cur_list = self.to_tree_list(parent_tree_item, my_rec)
+        self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, my_rec['level'], cur_list,
+                                  my_rec['contents'])
+        first_node = self.to_tree_node(cur_list, my_rec)
+        my_rec['list_node'] = cur_list
+        my_rec['tree_node'] = first_node
+        order = list(item_records.keys())
+        order.sort()
+        for loc_index in range(record_pos+1, len(order)):
+            rec_line = order[loc_index]
+            rec = item_records[rec_line]
+            if 'tree_node' in rec:
+                continue
+            if rec['level'] == my_rec['level']:
+                # it is possible that a malformed file has a list type change
+                # at the same level, but we are going to pretend that never happens
+                # and use the list type from the first item in the level
+                tree_node = self.to_tree_node(cur_list, rec, force_list_type=my_rec['list_type'])
+                self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, my_rec['level'], tree_node,
+                                  rec['contents'])
+                rec['tree_node'] = tree_node
+        
+        # now iterate over level + 1 items and call subparser for each
+        for loc_index in range(record_pos+1, len(order)):
+            line_pos = order[loc_index]
+            rec = item_records[line_pos]
+            if 'tree_node' in rec:
+                continue
+            if rec['level'] == my_rec['level'] + 1:
+                parent_rec = item_records[rec['prev_input_line']]
+                self.logger.debug("%15s @ level %d descending on '%s'", self.short_id, my_rec['level'], rec['contents'])
+                new_list,new_node = self.make_level_nodes(parent_rec['tree_node'], loc_index, item_records)
+                rec['tree_node'] = new_node
+                rec['list_node'] = new_list
+        return cur_list,my_rec['tree_node']
+    
+    def to_tree_list(self, parent_tree_item, record):
+        list_type = record['list_type']
+        margin = record['lindent']
+        if list_type == ListType.ordered_list:
+            the_list = OrderedList(parent=parent_tree_item, margin=margin)
+        elif list_type == ListType.unordered_list:
+            the_list = UnorderedList(parent=parent_tree_item, margin=margin)
+        elif list_type == ListType.def_list:
+            the_list = DefinitionList(parent=parent_tree_item, margin=margin)
+        return the_list
+    
+    def to_tree_node(self, the_list, record, force_list_type=None):
+        if "level 3 item 2" in record['contents']:
+            self.logger.debug('Called to_tree_node with %s, from record %s', str(the_list), record)
+        if force_list_type:
+            list_type = force_list_type
+        else:
+            list_type = record['list_type']
+        if list_type == ListType.ordered_list:
+            content_list = [Text(the_list, record['contents']),]
+            ordinal = record['bullet'].rstrip(".").rstrip(')')
+            item = OrderedListItem(the_list, ordinal, content_list)
+        elif list_type == ListType.unordered_list:
+            content_list = [Text(the_list, record['contents']),]
+            item = UnorderedListItem(the_list, content_list)
+        elif list_type == ListType.def_list:
+            title = DefinitionListItemTitle(the_list, record['tag'])
+            content_list = [Text(the_list, record['contents']),]
+            desc = DefinitionListItemDescription(the_list, content_list)
+            item = DefinitionListItem(the_list, title, desc)
+        return item
+    
     def list_line_get_type(self, line):
         # check def_list first, looks like unordered too
         for bullettype in [ListType.def_list, ListType.ordered_list, ListType.unordered_list]:
