@@ -81,28 +81,49 @@ def test_parser_stack():
     assert len(doc_parser.parse_problems) == 0
 
 def test_flat_ordered_list():
-    flat_ordered_list_inner()
+    flat_list_inner()
 
 def test_flat_ordered_list_with_objects():
-    flat_ordered_list_inner()
+    flat_list_inner()
     
 def test_flat_ordered_list_with_objects():
-    flat_ordered_list_inner(use_objects=True)
+    flat_list_inner(use_objects=True)
     
 def test_flat_ordered_list_append_para():
-    flat_ordered_list_inner(append_para=True)
+    flat_list_inner(append_para=True)
 
-def test_flat_ordered_list_append_para():
-    flat_ordered_list_inner(append_table=True)
+def test_flat_ordered_list_append_table():
+    flat_list_inner(append_table=True)
 
-def flat_ordered_list_inner(use_objects=False, append_para=False, append_table=False):
+def test_flat_unordered_list():
+    flat_list_inner(list_type="ordered")
+
+def test_flat_unordered_list_with_objects():
+    flat_list_inner(list_type="ordered")
+    
+def test_flat_unordered_list_with_objects():
+    flat_list_inner(list_type="ordered", use_objects=True)
+    
+def test_flat_unordered_list_append_para():
+    flat_list_inner(list_type="ordered", append_para=True)
+
+def test_flat_unordered_list_append_table():
+    flat_list_inner(list_type="ordered", append_table=True)
+
+def flat_list_inner(list_type="ordered", use_objects=False, append_para=False, append_table=False):
     file_start =  "file_start_with_props_and_title.org"
     start = get_frag_file_contents(file_start)
     section_kid_count = 1
     if use_objects:
-        list_part = get_frag_file_contents("ordered_flat_list_with_objects.org")
+        if list_type == "ordered":
+            list_part = get_frag_file_contents("ordered_flat_list_with_objects.org")
+        elif list_type == "unordered":
+            list_part = get_frag_file_contents("unordered_flat_list_with_objects.org")
     else:
-        list_part = get_frag_file_contents("ordered_flat_list.org")
+        if list_type == "ordered":
+            list_part = get_frag_file_contents("ordered_flat_list.org")
+        elif list_type == "unordered":
+            list_part = get_frag_file_contents("unordered_flat_list.org")
     if append_table:
         append_part = get_frag_file_contents("three_row_table.org")
     elif append_para:
