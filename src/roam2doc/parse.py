@@ -186,7 +186,7 @@ class DocParser:
                     tmp = prop_line.split(':')
                     name = tmp[1]
                     value = ":".join(tmp[2:])
-                    prop_dict[name] = value
+                    prop_dict[name] = value.lstrip()
                 self.logger.debug("parsed properties %s", pformat(prop_dict))
                 return prop_dict
             else:
@@ -202,10 +202,23 @@ class ParseTool:
         self.start = start
         self.end = end
         self.parent_tree_node = parent_tree_node
+        self.keywords = None
+        self.keyword_name = None
         self.logger = logging.getLogger('roam2doc-parser')
         self.match_log_format =  doc_parser.match_log_format
         self.no_match_log_format = doc_parser.no_match_log_format
-    
+
+    def set_keywords(self, keywords):
+        if len(keywords) == 0:
+            return
+        self.keywords = keywords
+        for w in keywords:
+            name_key_start = "#+name:"
+            if w.lower().startswith(name_key_start):
+                endpart = w[len(name_key_start):].strip()
+                if endpart != '':
+                    self.keyword_name = endpart
+            
     def get_parent_parser(self):
         # can't do this during init, not added to doc parser yet
         return self.doc_parser.get_parser_parent(self)
@@ -263,48 +276,17 @@ class SectionParse(ParseTool):
         if self.properties:
             self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
             pos += len(self.properties) + 2
+            if "ID" in self.properties:
+                self.doc_parser.root.add_link_target(self.tree_node, self.properties['ID'])
         tool_box = ToolBox(self.doc_parser)
         # now find all greater elements
         last_sub_start = pos - 1
         last_sub_end = pos - 1
-        if True:
-            gep = GreaterElementParse(self.doc_parser, pos, self.end, self.tree_node)
-            self.doc_parser.push_parser(gep)
-            gep.parse()
-            self.doc_parser.pop_parser(gep)
-            return self.end
-        gaps = []
-        while pos < self.end + 1:
-            elem  = tool_box.get_next_element(pos, self.end)
-            if elem:
-                self.logger.debug('%s found inner element %s at %d', str(self),
-                                  elem['match_type'],
-                                  elem['match_line'])
-                parse_tool = elem['parse_tool']
-                match_pos = elem['match_line']
-                if match_pos > last_sub_end:
-                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1, self.tree_node)
-                    self.doc_parser.push_parser(para)
-                    para.parse()
-                    self.doc_parser.pop_parser(para)
-                parser = parse_tool(self.doc_parser, match_pos, self.end, self.tree_node)
-                self.doc_parser.push_parser(parser)
-                sub_start = match_pos
-                sub_end = parser.parse()
-                self.doc_parser.pop_parser(parser)
-                pos = sub_end + 1
-                last_sub_start = match_pos
-                last_sub_end = sub_end
-            else:
-                # no more elements in range, so make a para
-                if last_sub_end < self.end:
-                    self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
-                                      last_sub_end + 1, self.end)
-                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, self.end, self.tree_node)
-                    self.doc_parser.push_parser(para)
-                    para.parse()
-                    self.doc_parser.pop_parser(para)
-                    pos = self.end + 1
+        gep = GreaterElementParse(self.doc_parser, pos, self.end, self.tree_node)
+        self.doc_parser.push_parser(gep)
+        gep.parse()
+        self.doc_parser.pop_parser(gep)
+        return self.end
         return self.end
 
     def __str__(self):
@@ -320,6 +302,8 @@ class TableParse(ParseTool):
         
     def parse(self):
         self.tree_node = table = Table(self.parent_tree_node)
+        if self.keyword_name:
+            self.doc_parser.root.add_link_target(table, self.keyword_name)
         tool_box = ToolBox(self.doc_parser)
         matcher = tool_box.get_matcher(MatcherType.table)
         pos = start_pos = self.start
@@ -373,6 +357,7 @@ class GreaterElementParse(ParseTool):
                 else:
                     sub_end = end
                 parser = parse_tool(self.doc_parser, match_pos, sub_end, self.tree_node)
+                parser.set_keywords(elem['keywords'])
                 self.doc_parser.push_parser(parser)
                 sub_start = match_pos
                 sub_end = parser.parse()
@@ -381,8 +366,8 @@ class GreaterElementParse(ParseTool):
                 last_sub_start = match_pos
                 last_sub_end = sub_end
             else:
-                # no more elements in range, so make a para
                 if last_sub_end < self.end:
+                    # when we are past
                     self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
                                       last_sub_end + 1, self.end)
                     para = ParagraphParse(self.doc_parser, last_sub_end + 1, end, self.tree_node)
@@ -734,6 +719,15 @@ class ParagraphParse(ParseTool):
             index += 1
             line_index = r_spec[0]
             for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
+                if line.startswith("#+"):
+                    line_index += 1
+                    continue
+                if line.startswith(":"):
+                    tmp = line.split(':')
+                    if len(tmp) > 2:
+                        if line.split()[0].endswith(':'):
+                            line_index += 1
+                            continue
                 if line_index == r_spec[1] and line.strip() == '':
                     # we do not include blank that ends a paragraph
                     pass
@@ -1131,10 +1125,12 @@ class ToolBox:
         """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
         things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
 
+        
         element_matchers = dict(self.greater_matchers)
         element_matchers.update(self.lesser_matchers)
         pos = start
         logger = logging.getLogger('roam2doc-parser')
+        pending_keywords = []
         for line in self.doc_parser.lines[start:end+1]:
             # greater elements
             for match_type, matcher in element_matchers.items():
@@ -1149,6 +1145,7 @@ class ToolBox:
                                match_line=pos,
                                start_char=match_res['start'],
                                end_char=match_res['end'],
+                               keywords=pending_keywords,
                                matched_contents=matched.groupdict())
                     if hasattr(matcher, 'match_end_line') and callable(getattr(matcher, 'match_end_line')):
                         subpos = pos + 1
@@ -1165,7 +1162,12 @@ class ToolBox:
                                 res['end_match'] = ressub
                             subpos += 1
                     return res
-                # lesser elements
+            # line unmatched, see if it right format for a keyword
+            if line.strip() == '':
+                # keywords only apply if no blank lines before element
+                pending_keywords = []
+            elif line.startswith("#+"):
+                pending_keywords.append(line)
             pos += 1
         return None
 
