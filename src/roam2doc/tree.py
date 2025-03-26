@@ -470,7 +470,6 @@ class QuoteBlock(Container):
         lines.append(padding + '</blockquote>')
         return lines
 
-
 class CodeBlock(Text):
 
     def get_css_styles(self):
@@ -486,6 +485,16 @@ class CodeBlock(Text):
         lines.append(self.text)
         lines.append(padding + '</code>')
         return lines
+
+class ExampleBlock(CodeBlock):
+    pass
+
+
+class CommentBlock(CodeBlock):
+    pass
+
+class ExportBlock(CodeBlock):
+    pass
 
 
 class List(Container):

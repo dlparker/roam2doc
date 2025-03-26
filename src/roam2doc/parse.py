@@ -7,7 +7,8 @@ from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
                          UnderlinedText, LinethroughText, InlineCodeText,
-                         VerbatimText, CenterBlock, QuoteBlock, CodeBlock, List,
+                         VerbatimText, CenterBlock, QuoteBlock, CodeBlock,
+                         ExampleBlock, CommentBlock, ExportBlock, List,
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
@@ -119,7 +120,7 @@ class DocParser:
         pos = start_offset + 1
         starts = []
         while pos < len(self.lines):
-            elem  = tool_box.next_greater_element(pos, len(self.lines))
+            elem  = tool_box.get_next_element(pos, len(self.lines))
             if elem is None:
                 break
             pos = elem['match_line']
@@ -274,7 +275,7 @@ class SectionParse(ParseTool):
             return self.end
         gaps = []
         while pos < self.end + 1:
-            elem  = tool_box.next_greater_element(pos, self.end)
+            elem  = tool_box.get_next_element(pos, self.end)
             if elem:
                 self.logger.debug('%s found inner element %s at %d', str(self),
                                   elem['match_type'],
@@ -325,7 +326,7 @@ class TableParse(ParseTool):
         short_id = f"Table@{start_pos}"
         while pos < self.end + 1:
             for line in self.doc_parser.lines[pos:self.end + 1]:
-                next_elem = tool_box.next_greater_element(pos, self.end)
+                next_elem = tool_box.get_next_element(pos, self.end)
                 if not next_elem:
                     return pos - 1
                 if next_elem['match_type'] != MatcherType.table:
@@ -355,7 +356,7 @@ class GreaterElementParse(ParseTool):
         tool_box = ToolBox(self.doc_parser)
         self.tree_node = self.parent_tree_node
         while pos < end + 1:
-            elem  = tool_box.next_greater_element(pos, end)
+            elem  = tool_box.get_next_element(pos, end)
             if elem:
                 self.logger.debug('%s found inner element %s at %d', str(self),
                                   elem['match_type'],
@@ -391,7 +392,8 @@ class GreaterElementParse(ParseTool):
                     pos = end + 1
         return end
 
-class QuoteParse(GreaterElementParse):
+class WrappedGEParse(GreaterElementParse):
+    tree_class = None
 
     def parse(self):
         # want to strip the wrapper lines
@@ -402,31 +404,69 @@ class QuoteParse(GreaterElementParse):
         self.start = elem_start
         self.end = elem_end
         parent_node = self.parent_tree_node
-        self.parent_tree_node = QuoteBlock(parent_node)
+        self.parent_tree_node = self.tree_class(parent_node)
         res = super().parse()
         self.parent_tree_node = parent_node 
         self.start = wrap_start
         self.end = wrap_end
         return self.end
-        
-class CenterParse(GreaterElementParse):
+
+class QuoteParse(WrappedGEParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = QuoteBlock
+
+class CenterParse(WrappedGEParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = CenterBlock
+
+class LesserElementParse(ParseTool):
+    tree_class = None
+    text_inside = False
+    
+    def __init__(self, doc_parser, start, end, parent_tree_node):
+        super().__init__(doc_parser, start, end, parent_tree_node)
 
     def parse(self):
-        # want to strip the wrapper lines
-        wrap_start = self.start
-        wrap_end = self.end
-        elem_start = wrap_start + 1
-        elem_end = wrap_end - 1
-        self.start = elem_start
-        self.end = elem_end
-        parent_node = self.parent_tree_node
-        self.parent_tree_node = CenterBlock(parent_node)
-        res = super().parse()
-        self.parent_tree_node = parent_node 
-        self.start = wrap_start
-        self.end = wrap_end
+        # all the supported lesser elements
+        # are "wrapped' with #+begin_xxx #+end_xxx
+        start = self.start + 1
+        end = self.end -1
+        buff = '\n'.join(self.doc_parser.lines[start:end + 1])
+        if self.text_inside:
+            tree_node = self.tree_class(self.parent_tree_node)
+            Text(tree_node, buff)
+        else:
+            self.tree_class(self.parent_tree_node, buff)
         return self.end
-        
+    
+class ExampleParse(LesserElementParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = ExampleBlock
+    
+class CodeParse(LesserElementParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = CodeBlock
+    
+class CommentParse(LesserElementParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = CommentBlock
+    
+class ExportParse(LesserElementParse):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_class = ExportBlock
+    
 class ListParse(ParseTool):
 
     def __init__(self, doc_parser, start, end, parent_tree_node):
@@ -960,12 +1000,47 @@ class MatchExample(LineRegexAndEndMatch):
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
+    def get_parse_tool(self):
+        return ExampleParse
+    
+
+class MatchCode(LineRegexAndEndMatch):
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_SRC', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_SRC', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+    def get_parse_tool(self):
+        return CommentParse
+    
+class MatchComment(LineRegexAndEndMatch):
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_COMMENT', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_COMMENT', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+    def get_parse_tool(self):
+        return ExportParse
+    
+class MatchExport(LineRegexAndEndMatch):
+    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_EXPORT', re.IGNORECASE),]
+    end_pattern = re.compile(r'^[ \t]*\#\+END_EXPORT', re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(self.patterns, self.end_pattern)
+
+    def get_parse_tool(self):
+        return ExportParse
+    
+
 class MatchGreaterEnd:
     
     def match_line_range(self, doc_parser, lines, start, end):
         pos = start
         tool_box = ToolBox(self.doc_parser)
-        next_elem = tool_box.next_greater_element(pos, end)
+        next_elem = tool_box.get_next_element(pos, end)
         return next_elem
 
 
@@ -990,6 +1065,9 @@ class MatcherType(str, Enum):
     greater_end = "GREATER_END"
     # lesser elements
     example_block = "EXAMPLE_BLOCK"
+    code_block = "CODE_BLOCK"
+    comment_block = "COMMENT_BLOCK"
+    export_block = "EXPORT_BLOCK"
 
     # special cases
     double_blank_line = "DOUBLE_BLANK_LINE"
@@ -1019,6 +1097,9 @@ class ToolBox:
                             }
     # lesser elements
     lesser_matchers = {MatcherType.example_block:MatchExample(),
+                       MatcherType.code_block:MatchCode(),
+                       MatcherType.comment_block:MatchComment(),
+                       MatcherType.export_block:MatchExport(),
                         }
     # objects
     object_matchers = {MatcherType.bold_object:BoldObjectMatcher(),
@@ -1046,14 +1127,17 @@ class ToolBox:
     def __init__(self, doc_parser):
         self.doc_parser = doc_parser
         
-    def next_greater_element(self, start, end):
+    def get_next_element(self, start, end):
         """ See https://orgmode.org/worg/org-syntax.html#Elements. Some
         things covered elsewhere such as the zeroth section, which is detected by the initial parser."""
+
+        element_matchers = dict(self.greater_matchers)
+        element_matchers.update(self.lesser_matchers)
         pos = start
         logger = logging.getLogger('roam2doc-parser')
         for line in self.doc_parser.lines[start:end+1]:
             # greater elements
-            for match_type, matcher in self.greater_matchers.items():
+            for match_type, matcher in element_matchers.items():
                 match_res = matcher.match_line(line)
                 if match_res:
                     logger.debug("matched %s at line %d", match_type, pos)
