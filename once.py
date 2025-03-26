@@ -89,6 +89,8 @@ def t2():
     lines.append('  + bar :: another word ofen used by programmers')
     lines.append('    + foobar :: see a pattern?')
     lines.append('    + beebop :: <<arubop>>')
+    lines.append('  Some text as a paragraph in an item!!!')
+    lines.append('  and a link [[Section 1 heading][*/back to the top!/*]]')
     lines.append('')
     lines.append('')
     lines.append(' */+bold italic strikethrough+/*')

@@ -483,28 +483,30 @@ class ListParse(ParseTool):
         list_type = record['list_type']
         tool_box = ToolBox(self.doc_parser)
         if list_type == ListType.ordered_list:
-            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
             ordinal = record['bullet'].rstrip(".").rstrip(')')
-            item = OrderedListItem(the_list, ordinal, content_list)
+            item = OrderedListItem(the_list, ordinal)
+            self.parse_item_contents(item, record)
         elif list_type == ListType.unordered_list:
             content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
-            item = UnorderedListItem(the_list, content_list)
+            item = UnorderedListItem(the_list, None)
+            self.parse_item_contents(item, record)
         elif list_type == ListType.def_list:
             title = DefinitionListItemTitle(the_list, record['tag'])
-            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
-            desc = DefinitionListItemDescription(the_list, content_list)
+            desc = DefinitionListItemDescription(the_list)
+            self.parse_item_contents(desc, record)
             item = DefinitionListItem(the_list, title, desc)
+        return item
+
+    def parse_item_contents(self, item, record):
+        tool_box = ToolBox(self.doc_parser)
+        # this will become bigger once I add parsing for other content such as elements
+        content_list = tool_box.get_text_and_object_nodes_in_line(item, record['contents'])
         if len(record['extra_lines']) > 0:
             xtra = record['extra_lines']
             para = ParagraphParse(self.doc_parser, xtra[0], xtra[-1], item)
             self.doc_parser.push_parser(para)
             para.parse()
             self.doc_parser.pop_parser(para)
-        return item
-
-    def parse_item_contents(self, the_list, record):
-        # this will become bigger once I add parsing for other content such as elements
-        content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
         
     def list_line_get_type(self, line):
         # check def_list first, looks like unordered too
