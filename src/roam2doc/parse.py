@@ -367,14 +367,16 @@ class ListParse(ParseTool):
         blank_count = 0
         pos += 1
         list_end = self.end
+        ends_on_blanks = False
         for line in self.doc_parser.lines[pos:self.end]:
             if heading_matcher.match_line(line):
                 list_end = pos
                 break
             if line.strip() == '':
                 blank_count += 1
-                if blank_count == 2:
+                if blank_count >= 2:
                     list_end = pos
+                    ends_on_blanks = True
                     break
             else:
                 blank_count = 0
@@ -415,6 +417,9 @@ class ListParse(ParseTool):
                 if last_match_pos is not None:
                     # these lines will be parsed to collect whatever is contained by
                     # the item, since it is a greater element.
+                    if ends_on_blanks and pos == self.list_end - 2:
+                        # don't add the blanks to the cotent of the last item
+                        continue
                     match_records[last_match_pos]['extra_lines'].append(pos)
             pos += 1
         if spaces_per_level is not None:
@@ -448,7 +453,10 @@ class ListParse(ParseTool):
                     parent_rec['children'] = []
                 parent_rec['children'].append(rec)
 
-        self.do_one_level(parent_parser.tree_node, top_level_records)
+        the_list = self.do_one_level(parent_parser.tree_node, top_level_records)
+        if ends_on_blanks:
+            BlankLine(the_list)
+            BlankLine(the_list)
         return self.list_end
 
     def do_one_level(self, parent_tree_node, level_records):
@@ -466,6 +474,7 @@ class ListParse(ParseTool):
             # for any children, recurse
             if "children" in record and len(record['children']) > 0:
                 self.do_one_level(tree_node, record['children'])
+        return cur_list
 
     def to_tree_list(self, parent_tree_item, record):
         list_type = record['list_type']
@@ -502,11 +511,45 @@ class ListParse(ParseTool):
         # this will become bigger once I add parsing for other content such as elements
         content_list = tool_box.get_text_and_object_nodes_in_line(item, record['contents'])
         if len(record['extra_lines']) > 0:
-            xtra = record['extra_lines']
-            para = ParagraphParse(self.doc_parser, xtra[0], xtra[-1], item)
-            self.doc_parser.push_parser(para)
-            para.parse()
-            self.doc_parser.pop_parser(para)
+            xtra = record['extra_lines'] 
+            start = xtra[0]
+            end = xtra[-1]
+            pos = start
+            last_sub_start = pos - 1
+            last_sub_end = pos - 1
+            gaps = []
+            self.tree_node = item
+            while pos < end + 1:
+                elem  = tool_box.next_greater_element(pos, end)
+                if elem:
+                    self.logger.debug('%s found inner element %s at %d', str(self),
+                                      elem['match_type'],
+                                      elem['match_line'])
+                    parse_tool = elem['parse_tool']
+                    match_pos = elem['match_line']
+                    if match_pos > last_sub_end:
+                        para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1)
+                        self.doc_parser.push_parser(para)
+                        para.parse()
+                        self.doc_parser.pop_parser(para)
+                    parser = parse_tool(self.doc_parser, match_pos, end)
+                    self.doc_parser.push_parser(parser)
+                    sub_start = match_pos
+                    sub_end = parser.parse()
+                    self.doc_parser.pop_parser(parser)
+                    pos = sub_end + 1
+                    last_sub_start = match_pos
+                    last_sub_end = sub_end
+                else:
+                    # no more elements in range, so make a para
+                    if last_sub_end < self.end:
+                        self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
+                                          last_sub_end + 1, self.end)
+                        para = ParagraphParse(self.doc_parser, last_sub_end + 1, end)
+                        self.doc_parser.push_parser(para)
+                        para.parse()
+                        self.doc_parser.pop_parser(para)
+                        pos = end + 1
         
     def list_line_get_type(self, line):
         # check def_list first, looks like unordered too

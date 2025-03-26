@@ -345,6 +345,11 @@ def test_nest_list():
     lines.append('- unordered list 3 starts')
     lines.append('  - unordered 3 sub 1 *bold*')
     lines.append('  Some text as a paragraph')
+    lines.append('| a | 1 |')
+    lines.append('| b | 2 |')
+    lines.append('')
+    lines.append('paragraph after table')
+    lines.append('')
     buff = '\n'.join(lines)
     
     logger = logging.getLogger("test_code")
