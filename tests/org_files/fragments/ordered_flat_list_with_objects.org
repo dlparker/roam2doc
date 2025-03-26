@@ -1,5 +1,3 @@
 1. Ordered list (flat) *line1*
 2. Ordered list (flat) /line2/
-3. Ordered list (flat) ~line3~
-
-
+3. Ordered list (flat) ~line3~ NO BLANK LINES AFTER PLEASE!

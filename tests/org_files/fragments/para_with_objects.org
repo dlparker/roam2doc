@@ -1,0 +1,13 @@
+   This is paragraph one text, it is *bold*
+
+   This is paragraph two text, it is ~code~
+
+   This is paragraph three text, it is /italian/.
+
+   This is paragraph four text, it is _underlined_
+
+   This is paragraph five text, it is +strikethrough+
+
+   This is paragraph six text, it is =verbatim=
+
+   This is paragraph seven text, it is <<a target>>   

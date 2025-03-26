@@ -10,7 +10,7 @@ from roam2doc.parse import (DocParser, MatchHeading, MatchDoubleBlank, MatchTabl
 from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
 from setup_logging import setup_logging
 
-setup_logging(default_level="debug")
+setup_logging(default_level="warning")
 
 start_frag_files = ["file_start_with_heading.org",
                     "file_start_with_no_heading.org",
@@ -82,36 +82,50 @@ def test_parser_stack():
 
 def test_flat_ordered_list():
     flat_ordered_list_inner()
+
+def test_flat_ordered_list_with_objects():
+    flat_ordered_list_inner()
+    
+def test_flat_ordered_list_with_objects():
     flat_ordered_list_inner(use_objects=True)
+    
+def test_flat_ordered_list_append_para():
     flat_ordered_list_inner(append_para=True)
+
+def test_flat_ordered_list_append_para():
+    flat_ordered_list_inner(append_table=True)
 
 def flat_ordered_list_inner(use_objects=False, append_para=False, append_table=False):
     file_start =  "file_start_with_props_and_title.org"
     start = get_frag_file_contents(file_start)
-    if use_objects == False and append_para == False and append_table == False:
-        list_part = get_frag_file_contents("ordered_flat_list.org")
+    section_kid_count = 1
     if use_objects:
         list_part = get_frag_file_contents("ordered_flat_list_with_objects.org")
+    else:
+        list_part = get_frag_file_contents("ordered_flat_list.org")
+    if append_table:
+        append_part = get_frag_file_contents("three_row_table.org")
     elif append_para:
-        list_part = get_frag_file_contents("ordered_flat_list_append_para.org")
+        append_part = get_frag_file_contents("para_with_objects.org")
+    else:
+        append_part = None
     contents = start + list_part
+    if append_part:
+        contents += append_part
     parser =  DocParser(contents, "")
     res = parser.parse()
     section_parse_0 = parser.sections[0]
     section_0 = section_parse_0.tree_node
     assert section_0 in parser.branch.children
     # should have one ordered list and one blank line
-    if len(section_0.children) != 2:
-        print(json.dumps(parser.root.to_json_dict(), indent=2))
-    assert len(section_0.children) == 2
+    assert len(section_0.children) == section_kid_count
     ol = section_0.children[0]
-    assert len(ol.children) == 5
+    assert len(ol.children) == 3
     assert isinstance(ol, OrderedList)
     assert isinstance(ol.children[0], OrderedListItem)
     assert isinstance(ol.children[1], OrderedListItem)
     assert isinstance(ol.children[2], OrderedListItem)
-    assert isinstance(ol.children[3], BlankLine)
-    assert isinstance(ol.children[4], BlankLine)
+
     
     
 def test_bad_file_properties():
