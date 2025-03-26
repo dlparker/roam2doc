@@ -214,6 +214,7 @@ class Container(Node):
     def add_node(self, node):
         if node not in self.children:
             self.children.append(node)
+            node.move_to_parent(self)
         
     def remove_node(self, node):
         try:
@@ -624,7 +625,7 @@ class DefinitionListItemTitle(Text):
         lines.append(line1)
         return lines
 
-class DefinitionListItemDescription(Container):
+class DefinitionListItemDescription(ListItem): # use to get contents support
 
     def to_html(self, indent_level):
         lines = []

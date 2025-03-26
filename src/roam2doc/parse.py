@@ -355,11 +355,11 @@ class ListParse(ParseTool):
         }
 
     def parse(self):
-        # first find the limits of the outer list
         parent_parser = self.doc_parser.get_parser_parent(self)
         pos = self.start
         end = self.end
         self.short_id = fr"List\@{pos}"
+        self.logger.info(self.match_log_format, self.short_id, "List", "parsing starting")
         # To begin, iterate over the lines looking for the end of the outer list
         # that means two blanks, a heading, or end of section
         tool_box = ToolBox(self.doc_parser)
@@ -381,6 +381,7 @@ class ListParse(ParseTool):
             pos += 1
         self.list_start = self.start
         self.list_end = list_end
+        self.logger.info(self.match_log_format, self.short_id, "List", f"found end of list at {list_end}")
         # We know we are on the first line of a list, so
         # figure out wnat kind and get our margin
         line = self.doc_parser.lines[self.start]
@@ -390,23 +391,31 @@ class ListParse(ParseTool):
         # an indent greater than ours, that will give us the spaces_per_level value
         spaces_per_level = None
         # a dict of the line matches indexed by line number
-        item_records = {}
+        match_records = {}
         
         pos = self.start
+        last_match_pos = None
         for line in self.doc_parser.lines[pos:self.list_end + 1]:
             match_res = self.list_line_get_type(line)
             if match_res:
                 self.logger.info(self.match_log_format, self.short_id, "List", line)
-                item_records[pos] = match_res
+                match_res['extra_lines'] = []
+                match_records[pos] = match_res
                 if pos == self.start:
                     match_res['prev_input_line'] = -1
                 else:
                     match_res['prev_input_line'] = last_match_pos
+                match_res['extra_lines'] = []
                 last_match_pos = pos
                 if match_res['lindent'] > self.margin and spaces_per_level is None:
                     # this line is indented beyond first so we can calc the
                     # indent to level ratio
                     spaces_per_level = match_res['lindent'] - self.margin
+            else:
+                if last_match_pos is not None:
+                    # these lines will be parsed to collect whatever is contained by
+                    # the item, since it is a greater element.
+                    match_records[last_match_pos]['extra_lines'].append(pos)
             pos += 1
         if spaces_per_level is not None:
             self.spaces_per_level = spaces_per_level
@@ -414,67 +423,50 @@ class ListParse(ParseTool):
         else:
             self.list_is_flat = False
 
-
-        # We now have a picture of where the list items are. We still don't
-        # know if they are all of the same type, or what level they have, or
-        # what content they have. Figure out these.
-        # Ensure we have a list of the list item line positions in ascending order
-        order = list(item_records.keys())
-        order.sort()
-        # start on the second one, find gaps between each
-        
-        last_line_pos = order[0]
-        for loc_index in range(0, len(order)):
-            line_pos = order[loc_index]
-            if line_pos > last_line_pos + 1:
-                item_records[last_line_pos]['last_content_line'] = line_pos - 1
-            rec = item_records[line_pos]
-            rec['changes_type'] = rec['list_type'] != first_match_res['list_type']
-            if self.spaces_per_level is not None and rec['lindent'] > self.margin:
-                rec['level'] = int((rec['lindent'] - self.margin) / self.spaces_per_level) + 1 
+        # Now fix the levels
+        for line_index,record in match_records.items():
+            if self.spaces_per_level is not None and record['lindent'] > self.margin:
+                record['level'] = int((record['lindent'] - self.margin) / self.spaces_per_level) + 1 
             else:
-                rec['level'] = 1
-        cur_list = self.make_level_nodes(parent_parser.tree_node, order[0], item_records)
-        return self.list_end
-                
-    def make_level_nodes(self, parent_tree_item, record_pos, item_records):
-        my_rec = item_records[record_pos]
-        cur_list = self.to_tree_list(parent_tree_item, my_rec)
-        self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, my_rec['level'], cur_list,
-                                  my_rec['contents'])
-        first_node = self.to_tree_node(cur_list, my_rec)
-        my_rec['list_node'] = cur_list
-        my_rec['tree_node'] = first_node
-        order = list(item_records.keys())
-        order.sort()
-        for loc_index in range(record_pos+1, len(order)):
-            rec_line = order[loc_index]
-            rec = item_records[rec_line]
-            if 'tree_node' in rec:
-                continue
-            if rec['level'] == my_rec['level']:
-                # it is possible that a malformed file has a list type change
-                # at the same level, but we are going to pretend that never happens
-                # and use the list type from the first item in the level
-                tree_node = self.to_tree_node(cur_list, rec, force_list_type=my_rec['list_type'])
-                self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, my_rec['level'], tree_node,
-                                  rec['contents'])
-                rec['tree_node'] = tree_node
+                record['level'] = 1
         
-        # now iterate over level + 1 items and call subparser for each
-        for loc_index in range(record_pos+1, len(order)):
-            line_pos = order[loc_index]
-            rec = item_records[line_pos]
-            if 'tree_node' in rec:
-                continue
-            if rec['level'] == my_rec['level'] + 1:
-                parent_rec = item_records[rec['prev_input_line']]
-                self.logger.debug("%15s @ level %d descending on '%s'", self.short_id, my_rec['level'], rec['contents'])
-                new_list,new_node = self.make_level_nodes(parent_rec['tree_node'], loc_index, item_records)
-                rec['tree_node'] = new_node
-                rec['list_node'] = new_list
-        return cur_list,my_rec['tree_node']
-    
+        # Now that we know everyone's indent level, we can latch the child matches onto the
+        # parents so there is no confusion about which item each attaches to
+        match_order = list(match_records.keys())
+        match_order.sort()
+        top_level_records = []
+        level_lasts = {}
+        for line_index in match_order:
+            rec = match_records[line_index]
+            level = rec['level']
+            level_lasts[level] = rec
+            if level == 1:
+                top_level_records.append(rec)
+            else:
+                parent_rec = level_lasts[level-1]
+                if 'children' not in parent_rec:
+                    parent_rec['children'] = []
+                parent_rec['children'].append(rec)
+
+        self.do_one_level(parent_parser.tree_node, top_level_records)
+        return self.list_end
+
+    def do_one_level(self, parent_tree_node, level_records):
+        first_rec = level_records[0]
+        cur_list = self.to_tree_list(parent_tree_node, first_rec)
+        self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, first_rec['level'], cur_list,
+                                  first_rec['contents'])
+        first_rec['tree_list'] = cur_list
+        
+        for record in level_records:
+            tree_node = self.to_tree_node(cur_list, record)
+            record['tree_node'] = tree_node
+            self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, record['level'], tree_node,
+                              record['contents'])
+            # for any children, recurse
+            if "children" in record and len(record['children']) > 0:
+                self.do_one_level(tree_node, record['children'])
+
     def to_tree_list(self, parent_tree_item, record):
         list_type = record['list_type']
         margin = record['lindent']
@@ -486,27 +478,34 @@ class ListParse(ParseTool):
             the_list = DefinitionList(parent=parent_tree_item, margin=margin)
         return the_list
     
-    def to_tree_node(self, the_list, record, force_list_type=None):
-        if "level 3 item 2" in record['contents']:
-            self.logger.debug('Called to_tree_node with %s, from record %s', str(the_list), record)
-        if force_list_type:
-            list_type = force_list_type
-        else:
-            list_type = record['list_type']
+    def to_tree_node(self, the_list, record):
+        self.logger.debug('Called to_tree_node with %s, from record %s', str(the_list), record['contents'])
+        list_type = record['list_type']
+        tool_box = ToolBox(self.doc_parser)
         if list_type == ListType.ordered_list:
-            content_list = [Text(the_list, record['contents']),]
+            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
             ordinal = record['bullet'].rstrip(".").rstrip(')')
             item = OrderedListItem(the_list, ordinal, content_list)
         elif list_type == ListType.unordered_list:
-            content_list = [Text(the_list, record['contents']),]
+            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
             item = UnorderedListItem(the_list, content_list)
         elif list_type == ListType.def_list:
             title = DefinitionListItemTitle(the_list, record['tag'])
-            content_list = [Text(the_list, record['contents']),]
+            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
             desc = DefinitionListItemDescription(the_list, content_list)
             item = DefinitionListItem(the_list, title, desc)
+        if len(record['extra_lines']) > 0:
+            xtra = record['extra_lines']
+            para = ParagraphParse(self.doc_parser, xtra[0], xtra[-1], item)
+            self.doc_parser.push_parser(para)
+            para.parse()
+            self.doc_parser.pop_parser(para)
         return item
-    
+
+    def parse_item_contents(self, the_list, record):
+        # this will become bigger once I add parsing for other content such as elements
+        content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
+        
     def list_line_get_type(self, line):
         # check def_list first, looks like unordered too
         for bullettype in [ListType.def_list, ListType.ordered_list, ListType.unordered_list]:
@@ -514,15 +513,6 @@ class ListParse(ParseTool):
             if match_res:
                 return match_res
         return None
-
-    def handle_item_para(self, item):
-        if len(item.para_lines) < 1:
-            return
-        para = ParagraphParse(self.doc_parser, item.para_lines[0], item.para_lines[-1])
-        self.doc_parser.push_parser(para)
-        para.parse()
-        self.doc_parser.pop_parser(para)
-        item.para_lines = []
 
     def parse_list_item(self, line, list_type):
         """Parse a single list item line and return its components."""
@@ -545,18 +535,25 @@ class ListParse(ParseTool):
             'tag': parts.get('tag'),             # For def lists, None otherwise
             'contents': parts['contents'] or ''  # Rest of line, empty if None
         }
+
+
     
         
 class ParagraphParse(ParseTool):
 
-    def __init__(self, doc_parser, start, end):
+    def __init__(self, doc_parser, start, end, tree_parent=None):
         super().__init__(doc_parser, start, end)
         self.start = start
         self.end = end
+        self.tree_parent = tree_parent
         self.logger = logging.getLogger('roam2doc-parser')
         
     def parse(self):
         parent = self.get_parent_parser()
+        if self.tree_parent:
+            parent_node = self.tree_parent
+        else:
+            parent_node = parent.tree_node
         pos = self.start
         end = self.end
         any = False
@@ -565,14 +562,14 @@ class ParagraphParse(ParseTool):
         while pos < self.end + 1 and not any:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if line.strip() == "":
-                    BlankLine(parent.tree_node)
+                    BlankLine(parent_node)
                     pos += 1
                 else:
                     any = True
                     break
         if pos > self.end:
             return
-        self.tree_node = para = Paragraph(parent.tree_node)
+        self.tree_node = para = Paragraph(parent_node)
         self.logger.debug('Adding paragraph to parser %s', parent)
         # find all the paragraphs first
         ranges = []
@@ -581,8 +578,6 @@ class ParagraphParse(ParseTool):
         last_was_blank = False
         while pos < self.end + 1:
             for line in self.doc_parser.lines[pos:end + 1]:
-                if breaking and "a link" in line:
-                    breakpoint()
                 if line.strip() != "":
                     if last_was_blank:
                         ranges.append([prev_end + 1, pos - 1])
@@ -597,20 +592,11 @@ class ParagraphParse(ParseTool):
         elif prev_end < self.end + 1:
             ranges.append([prev_end, self.end])
 
-        if breaking:
-            for line_sub in self.doc_parser.lines[self.start:self.end]:
-                print(line_sub)
-            for r in ranges:
-                print(r, '---------')
-                for line_sub in self.doc_parser.lines[r[0]: r[1]+1]:
-                    print(line_sub)
-            breakpoint()
-
         tool_box = ToolBox(self.doc_parser)
         index = 0
         for r_spec in ranges:
             if index > 0:
-                para = Paragraph(parent.tree_node)
+                para = Paragraph(parent_node)
             index += 1
             line_index = r_spec[0]
             for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
@@ -1084,8 +1070,5 @@ class ToolBox:
             desc = item['matched'].groupdict()['description']
             tree_item = InternalLink(tree_node, target_text, None)
             items = self.get_text_and_object_nodes_in_line(tree_item, desc)
-            if len(items) == 1:
-                tree_item.display_text = desc
-                tree_item.remove_node(items[0])
         return tree_item
         
