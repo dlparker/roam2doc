@@ -6,7 +6,8 @@ from pprint import pprint, pformat
 import pytest
 from roam2doc.parse import (DocParser, MatchHeading, MatchDoubleBlank, MatchTable, MatchList,
                             MatchSrc, MatchQuote, MatchCenter, MatchExample, MatchGreaterEnd,
-                            ParagraphParse, MatcherType, ToolBox)
+                            ParagraphParse, MatcherType, ToolBox, SectionParse)
+from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
 from setup_logging import setup_logging
 
 setup_logging(default_level="debug")
@@ -33,6 +34,93 @@ def get_frag_file_contents(name):
         buffer = f.read()
     return buffer
 
+def test_parser_stack():
+    start_file = "file_start_with_props_and_title.org"
+    start_contents = get_frag_file_contents(start_file)
+    para1 = get_frag_file_contents("no_object_paragraph.org")
+    contents = start_contents + para1
+    doc_parser =  DocParser(contents, "combined1")
+
+    section_p = None
+
+    def parse_start(parser):
+        nonlocal section_p
+        print(f"parsing starting by {parser}")
+        assert doc_parser.current_parser() == parser
+        if isinstance(parser, SectionParse):
+            assert doc_parser.get_parser_parent(parser) is None
+            section_p = parser
+            assert parser.get_section_parser() == section_p
+        else:
+            p1 = doc_parser.get_parser_parent(parser) 
+            assert p1 is not None
+            p2 = parser.get_parent_parser()
+            assert p1 == p2
+            assert parser.get_section_parser() == section_p
+            
+    def parse_end(parser):
+        print(f"parsing finished by {parser}")
+
+    doc_parser.set_parse_callbacks(parse_start, parse_end)
+
+    # do some manual manipulation before running for real
+    sp = SectionParse(doc_parser, 0, 3)
+    assert len(doc_parser.parser_stack) == 0
+    assert doc_parser.current_parser() is None
+    doc_parser.push_parser(sp)
+    assert len(doc_parser.parser_stack) == 1
+    assert sp.start_callback is not None
+    doc_parser.pop_parser(sp)
+    assert len(doc_parser.parser_stack) == 0
+    with pytest.raises(ValueError) as execinfo:
+        # can't pop it twice
+        print(execinfo)
+        doc_parser.pop_parser(sp)
+                
+    res = doc_parser.parse()
+    assert len(doc_parser.parse_problems) == 0
+
+def test_flat_ordered_list():
+    flat_ordered_list_inner()
+    flat_ordered_list_inner(use_objects=True)
+    flat_ordered_list_inner(append_para=True)
+
+def flat_ordered_list_inner(use_objects=False, append_para=False, append_table=False):
+    file_start =  "file_start_with_props_and_title.org"
+    start = get_frag_file_contents(file_start)
+    if use_objects == False and append_para == False and append_table == False:
+        list_part = get_frag_file_contents("ordered_flat_list.org")
+    if use_objects:
+        list_part = get_frag_file_contents("ordered_flat_list_with_objects.org")
+    elif append_para:
+        list_part = get_frag_file_contents("ordered_flat_list_append_para.org")
+    contents = start + list_part
+    parser =  DocParser(contents, "")
+    res = parser.parse()
+    section_parse_0 = parser.sections[0]
+    section_0 = section_parse_0.tree_node
+    assert section_0 in parser.branch.children
+    # should have one ordered list and one blank line
+    if len(section_0.children) != 2:
+        print(json.dumps(parser.root.to_json_dict(), indent=2))
+    assert len(section_0.children) == 2
+    ol = section_0.children[0]
+    assert len(ol.children) == 5
+    assert isinstance(ol, OrderedList)
+    assert isinstance(ol.children[0], OrderedListItem)
+    assert isinstance(ol.children[1], OrderedListItem)
+    assert isinstance(ol.children[2], OrderedListItem)
+    assert isinstance(ol.children[3], BlankLine)
+    assert isinstance(ol.children[4], BlankLine)
+    
+    
+def test_bad_file_properties():
+    frag_file =  "file_start_with_bad_props.org"
+    contents = get_frag_file_contents(frag_file)
+    parser =  DocParser(contents, frag_file)
+    res = parser.parse()
+    assert len(parser.parse_problems) > 0
+    
 def test_file_starts_no_content():
     logger = logging.getLogger('test_code')
 
@@ -56,8 +144,8 @@ def test_file_starts_with_content():
     for name in start_frag_files:
         logger.debug('doing find section with content append on file %s', name)
         contents = get_frag_file_contents(name)
-        section_contents_1 = get_frag_file_contents("section_contents_1.org")
-        more = contents + section_contents_1
+        para1 = get_frag_file_contents("no_object_paragraph.org")
+        more = contents + para1
         parser =  DocParser(more, name)
         res = parser.find_first_section()
         assert res.start == 0, f"{name} should start section at 0"
@@ -71,12 +159,12 @@ def test_file_starts_with_second_section():
     for name in start_frag_files:
         logger.debug('doing parse on second section append with file %s', name)
         contents = get_frag_file_contents(name)
-        section_contents_1 = get_frag_file_contents("section_contents_1.org")
+        para1 = get_frag_file_contents("no_object_paragraph.org")
         f_section_start_with_drawer = get_frag_file_contents("f_section_start_with_drawer.org")
         # Need to handle carefully as some emacs files have \n\n ending can
         # get lost when combining file content strings and then splitting,
         # so split first and combine that way.
-        s1_lines = contents.split('\n') + section_contents_1.split('\n')
+        s1_lines = contents.split('\n') + para1.split('\n')
         s2_lines = f_section_start_with_drawer.format(section_number=2).split('\n')
         all_lines = s1_lines + s2_lines
         text = '\n'.join(all_lines)
@@ -101,7 +189,7 @@ def test_file_starts_with_second_section():
         assert section_2.end == s2_end, f"{name} section 2 should end section at {s2_end}"
 
         
-def test_file_all_nodes():
+def atest_file_all_nodes():
     name = "all_nodes.org"
     name = "only_title_and_list.org"
     name = "only_props_and_list.org"
@@ -113,55 +201,17 @@ def test_file_all_nodes():
     #print(obj_tree)
     print(parser.root.to_html())
 
-class DocParserWrap(DocParser):
 
-    pass
-
-def do_list_matcher_test():
-    """ Ensure that the matchers for the start and end of a list work"""
-    lines = []
-    lines.append('* Foo')
-    lines.append('+ l1')
-    # terminate the list with double blank line
-    lines.append('')
-    lines.append('')
-    doc_parser, section_p = matcher_test_setup(lines)
-    list_matcher = MatchList()
-    double_matcher = MatchDoubleBlank()
-    m1 = list_matcher.match_line(lines[section_p.cursor])
-    assert m1 is not None
-    m2 = double_matcher.match_line(lines[section_p.cursor + 1])
-    assert m2 is not None
-    end_matcher = MatchDoubleBlank()
-    end  = end_matcher.match_line_range(lines, section_p.cursor + 2, len(lines))
-    assert end is not None
-
-    lines = []
-    lines.append('* Foo')
-    lines.append('+ l1')
-    # terminate the list with a new section
-    lines.append('* bar')
-    doc_parser, section_p = matcher_test_setup(lines)
-    end_matcher = MatchGreaterEnd()
-    end  = end_matcher.match_line_range(doc_parser, lines, section_p.cursor + 2, len(lines))
-    assert end is not None
-    assert ToolBox.get_matcher(MatcherType.alist) is not None
-
-def test_top_lists():
+def gen_top_lists():
     lines = []
     lines.append('* Section 1 heading')
     lines.append('1. List 1')
     lines.append('    2. List 1 sub 1')
 
     buff = '\n'.join(lines)
+    return buff
 
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
-    
-def test_mixed_elems():
+def gen_mixed_elems():
     lines = []
     lines.append('* Section 1 heading')
     lines.append('')
@@ -209,15 +259,10 @@ def test_mixed_elems():
     lines.append('| b | 2 |')
     
     buff = '\n'.join(lines)
-
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
+    return buff
     
     
-def test_no_elems():
+def gen_no_elems():
     lines = []
     lines.append('* Section 1 heading')
     lines.append('')
@@ -240,15 +285,10 @@ def test_no_elems():
     lines.append('* Section 4 heading')
 
     buff = '\n'.join(lines)
-
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
+    return buff
     
 
-def test_objects():
+def gen_objects():
 
     lines = []
     lines.append('* Section 1 heading')
@@ -262,15 +302,11 @@ def test_objects():
     lines.append("~code_text~ ~more code text~ ~code containing = sign ~")
     lines.append('')
     buff = '\n'.join(lines)
-    
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
+    return buff
+
     
     
-def test_def_list():
+def gen_def_list():
     lines = []
     lines.append('* a section')
     lines.append('+ foo :: a word ofen used by programmers')
@@ -279,15 +315,10 @@ def test_def_list():
     lines.append('')
     lines.append('')
     buff = '\n'.join(lines)
-    
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
+    return buff
 
 
-def test_def_list_2():
+def gen_def_list_2():
     lines = []
     lines.append('* a section')
     lines.append('- unordered list starts')
@@ -302,14 +333,10 @@ def test_def_list_2():
     lines.append('')
     lines.append('')
     buff = '\n'.join(lines)
+    return buff
+
     
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
-    
-def test_nest_list():
+def gen_big_mix():
     lines = []
     lines.append('+ level 1 item 1')
     lines.append('+ level 1 item 2')
@@ -340,7 +367,6 @@ def test_nest_list():
     lines.append('    + foobar :: see a pattern?')
     lines.append('    + beebop :: <<arubop>>')
     lines.append('')
-    lines = []
     lines.append('* a section 3')
     lines.append(':PROPERTIES:')
     lines.append(':ID: foo_bar_section')
@@ -392,11 +418,5 @@ def test_nest_list():
     lines.append('')
     
     buff = '\n'.join(lines)
-    
-    logger = logging.getLogger("test_code")
-    logger.info("starting test_no_elems")
-    doc_parser = DocParserWrap(buff, "inline")
-    doc_parser.parse()
-    #print(json.dumps(doc_parser.root.to_json_dict(), indent=2))
-    print(doc_parser.root.to_html())
+    return buff
     

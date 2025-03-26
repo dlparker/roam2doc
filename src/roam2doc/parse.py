@@ -34,10 +34,21 @@ class DocParser:
         self.no_match_log_format = "%15s %12s matched line %s"
         self.parser_stack = []
         self.parse_problems = []
+        self.parse_start_callback = None
+        self.parse_end_callback = None
         self.logger = logging.getLogger('roam2doc-parser')
+
+    def set_parse_callbacks(self, start_cb, end_cb):
+        # For support of whitebox testing, this will
+        # cause each parser to have this callback set
+        # on it when pushed on the stack
+        self.parse_start_callback = start_cb
+        self.parse_end_callback = end_cb
         
     def push_parser(self, parser):
         self.parser_stack.append(parser)
+        if self.parse_start_callback or self.parse_end_callback:
+            parser.set_callbacks(self.parse_start_callback, self.parse_end_callback)
 
     def current_parser(self):
         if len(self.parser_stack) > 0:
@@ -47,8 +58,12 @@ class DocParser:
     def pop_parser(self, parser):
         index = self.parser_stack.index(parser)
         if index != len(self.parser_stack) - 1:
-            raise ValueError('parser not last in stack')
+            # why doesn't covereage see this when I
+            # definitely hit it during testing.
+            # Cannot figure it out
+            raise ValueError('parser not last in stack') # pragma: no cover
         self.parser_stack.pop(-1)
+        parser.set_callbacks(None, None)
 
     def get_parser_parent(self, parser):
         # let the exception propogate
@@ -190,7 +205,9 @@ class DocParser:
                 self.logger.debug("parsed properties %s", pformat(prop_dict))
                 return prop_dict
             else:
-                self.logger.warning("failed to parse properties starting on line %d", offset)
+                msg = f"failed to parse properties starting on line {start}"
+                self.logger.warning(msg)
+                self.record_parse_problem(msg)
         return None
 
 
@@ -205,9 +222,16 @@ class ParseTool:
         self.keywords = None
         self.keyword_name = None
         self.logger = logging.getLogger('roam2doc-parser')
+        # these are only used to support whitebox testing techniques
+        self.start_callback = None
+        self.end_callback = None
         self.match_log_format =  doc_parser.match_log_format
         self.no_match_log_format = doc_parser.no_match_log_format
 
+    def set_callbacks(self, start_cb, end_cb):
+        self.start_callback = start_cb
+        self.end_callback = end_cb
+        
     def set_keywords(self, keywords):
         if len(keywords) == 0:
             return
@@ -226,10 +250,10 @@ class ParseTool:
     def get_section_parser(self):
         if isinstance(self, SectionParse):
             return self
-        p = self.doc_parser.get_parser_parent(self)
-        while p is not None and not isinstance(p, SectionParse):
-            p.doc_parser.get_parser_parent(p)
-        return p
+        par = self.doc_parser.get_parser_parent(self)
+        while par is not None and not isinstance(par, SectionParse):
+            par = self.doc_parser.get_parser_parent(par)
+        return par
 
 class SectionParse(ParseTool):
 
@@ -263,6 +287,8 @@ class SectionParse(ParseTool):
         return False
 
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         found_heading = self.calc_level()
         pos = self.start
         if found_heading:
@@ -286,7 +312,8 @@ class SectionParse(ParseTool):
         self.doc_parser.push_parser(gep)
         gep.parse()
         self.doc_parser.pop_parser(gep)
-        return self.end
+        if self.end_callback:
+            self.end_callback(self)
         return self.end
 
     def __str__(self):
@@ -301,6 +328,8 @@ class TableParse(ParseTool):
         super().__init__(doc_parser, start, end, parent_tree_node)
         
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         self.tree_node = table = Table(self.parent_tree_node)
         if self.keyword_name:
             self.doc_parser.root.add_link_target(table, self.keyword_name)
@@ -323,6 +352,8 @@ class TableParse(ParseTool):
                     for citem in content_list:
                         citem.move_to_parent(cell)
                 pos += 1
+        if self.end_callback:
+            self.end_callback(self)
         return self.end
 
 class GreaterElementParse(ParseTool):
@@ -331,6 +362,8 @@ class GreaterElementParse(ParseTool):
         super().__init__(doc_parser, start, end, parent_tree_node)
 
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         pos = self.start
         end = self.end
         self.short_id = fr"GenELem\@{pos}"
@@ -375,12 +408,16 @@ class GreaterElementParse(ParseTool):
                     para.parse()
                     self.doc_parser.pop_parser(para)
                     pos = end + 1
+        if self.end_callback:
+            self.end_callback(self)
         return end
 
 class WrappedGEParse(GreaterElementParse):
     tree_class = None
 
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         # want to strip the wrapper lines
         wrap_start = self.start
         wrap_end = self.end
@@ -394,6 +431,8 @@ class WrappedGEParse(GreaterElementParse):
         self.parent_tree_node = parent_node 
         self.start = wrap_start
         self.end = wrap_end
+        if self.end_callback:
+            self.end_callback(self)
         return self.end
 
 class QuoteParse(WrappedGEParse):
@@ -416,6 +455,8 @@ class LesserElementParse(ParseTool):
         super().__init__(doc_parser, start, end, parent_tree_node)
 
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         # all the supported lesser elements
         # are "wrapped' with #+begin_xxx #+end_xxx
         start = self.start + 1
@@ -426,6 +467,8 @@ class LesserElementParse(ParseTool):
             Text(tree_node, buff)
         else:
             self.tree_class(self.parent_tree_node, buff)
+        if self.end_callback:
+            self.end_callback(self)
         return self.end
     
 class ExampleParse(LesserElementParse):
@@ -468,6 +511,8 @@ class ListParse(ParseTool):
         }
 
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         pos = self.start
         end = self.end
         self.short_id = fr"List\@{pos}"
@@ -571,6 +616,8 @@ class ListParse(ParseTool):
         if ends_on_blanks:
             BlankLine(the_list)
             BlankLine(the_list)
+        if self.end_callback:
+            self.end_callback(self)
         return self.list_end
 
     def do_one_level(self, parent_tree_node, level_records):
@@ -673,6 +720,8 @@ class ParagraphParse(ParseTool):
         self.logger = logging.getLogger('roam2doc-parser')
         
     def parse(self):
+        if self.start_callback:
+            self.start_callback(self)
         pos = self.start
         end = self.end
         any = False
@@ -737,6 +786,8 @@ class ParagraphParse(ParseTool):
                 else:
                     items = tool_box.get_text_and_object_nodes_in_line(para, line)
                 line_index += 1
+        if self.end_callback:
+            self.end_callback(self)
         return self.end 
 
 class LineRegexMatch:

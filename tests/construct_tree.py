@@ -1,7 +1,7 @@
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
                          UnderlinedText, LinethroughText, InlineCodeText,
-                         VerbatimText, Blockquote, CodeBlock, List,
+                         VerbatimText, QuoteBlock, CodeBlock, List,
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
@@ -52,7 +52,7 @@ def build_tree_1():
     code += "    return 'perfect\n"
     codeblock = CodeBlock(blocks_section, code)
 
-    block_quote = Blockquote(blocks_section, cite="https://foo.org")
+    block_quote = QuoteBlock(blocks_section, cite="https://foo.org")
     bq_text = Text(block_quote, 'Should be in block quote')
 
     olist_section = Section(root.trunk, heading_text="OrderedList Section")
