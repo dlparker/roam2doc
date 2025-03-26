@@ -439,7 +439,12 @@ class VerbatimText(TextTag):
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
 
-class Blockquote(Container):
+class CenterBlock(Container):
+    
+    def get_css_styles(self):
+        return [dict(name="text-align", value="center"),]
+    
+class QuoteBlock(Container):
 
     def __init__(self, parent, cite=None, content=None):
         super().__init__(parent)
@@ -643,7 +648,7 @@ class Table(Container):
     def get_css_styles(self):
         res = []
         res.append(dict(name="table-layout", value="fixed"))
-        res.append(dict(name="margin-left", value="10em"))
+        res.append(dict(name="display", value="inline-block"))
         res.append(dict(name="border", value="1px solid black"))
         return res
     

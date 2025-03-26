@@ -7,7 +7,7 @@ from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
                          LinkTarget, BoldText, ItalicText,
                          UnderlinedText, LinethroughText, InlineCodeText,
-                         VerbatimText, Blockquote, CodeBlock, List,
+                         VerbatimText, CenterBlock, QuoteBlock, CodeBlock, List,
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
@@ -195,11 +195,12 @@ class DocParser:
 
 class ParseTool:
 
-    def __init__(self, doc_parser, start, end):
+    def __init__(self, doc_parser, start, end, parent_tree_node):
         self.doc_parser = doc_parser
         self.tree_node = None
         self.start = start
         self.end = end
+        self.parent_tree_node = parent_tree_node
         self.logger = logging.getLogger('roam2doc-parser')
         self.match_log_format =  doc_parser.match_log_format
         self.no_match_log_format = doc_parser.no_match_log_format
@@ -216,16 +217,17 @@ class ParseTool:
             p.doc_parser.get_parser_parent(p)
         return p
 
-
 class SectionParse(ParseTool):
 
-    def __init__(self, doc_parser, start, end):
+    def __init__(self, doc_parser, start, end, parent_tree_node=None):
         self.start = start
         self.end = end
         self.level = 0
         self.heading_text = None
         self.properties = None
-        super().__init__(doc_parser, start, end)
+        if parent_tree_node is None:
+            parent_tree_node = doc_parser.branch
+        super().__init__(doc_parser, start, end, parent_tree_node)
 
     def calc_level(self):
         first_line = self.doc_parser.lines[self.start].lstrip()
@@ -251,12 +253,7 @@ class SectionParse(ParseTool):
         pos = self.start
         if found_heading:
             pos += 1
-        parent = self.get_parent_parser()
-        if parent:
-            tree_parent = parent.tree_node
-        else:
-            tree_parent = self.doc_parser.branch
-        self.tree_node = Section(tree_parent, self.heading_text)
+        self.tree_node = Section(self.parent_tree_node, self.heading_text)
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
             return self.end
@@ -269,6 +266,12 @@ class SectionParse(ParseTool):
         # now find all greater elements
         last_sub_start = pos - 1
         last_sub_end = pos - 1
+        if True:
+            gep = GreaterElementParse(self.doc_parser, pos, self.end, self.tree_node)
+            self.doc_parser.push_parser(gep)
+            gep.parse()
+            self.doc_parser.pop_parser(gep)
+            return self.end
         gaps = []
         while pos < self.end + 1:
             elem  = tool_box.next_greater_element(pos, self.end)
@@ -279,11 +282,11 @@ class SectionParse(ParseTool):
                 parse_tool = elem['parse_tool']
                 match_pos = elem['match_line']
                 if match_pos > last_sub_end:
-                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1)
+                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1, self.tree_node)
                     self.doc_parser.push_parser(para)
                     para.parse()
                     self.doc_parser.pop_parser(para)
-                parser = parse_tool(self.doc_parser, match_pos, self.end)
+                parser = parse_tool(self.doc_parser, match_pos, self.end, self.tree_node)
                 self.doc_parser.push_parser(parser)
                 sub_start = match_pos
                 sub_end = parser.parse()
@@ -296,7 +299,7 @@ class SectionParse(ParseTool):
                 if last_sub_end < self.end:
                     self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
                                       last_sub_end + 1, self.end)
-                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, self.end)
+                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, self.end, self.tree_node)
                     self.doc_parser.push_parser(para)
                     para.parse()
                     self.doc_parser.pop_parser(para)
@@ -311,13 +314,11 @@ class SectionParse(ParseTool):
 
 class TableParse(ParseTool):
 
-    def __init__(self, doc_parser, start, end):
-        super().__init__(doc_parser, start, end)
+    def __init__(self, doc_parser, start, end, parent_tree_node):
+        super().__init__(doc_parser, start, end, parent_tree_node)
         
     def parse(self):
-        parent_parser = self.doc_parser.get_parser_parent(self)
-        parent_tree_node = parent_parser.tree_node
-        self.tree_node = table = Table(parent_tree_node)
+        self.tree_node = table = Table(self.parent_tree_node)
         tool_box = ToolBox(self.doc_parser)
         matcher = tool_box.get_matcher(MatcherType.table)
         pos = start_pos = self.start
@@ -339,10 +340,97 @@ class TableParse(ParseTool):
                 pos += 1
         return self.end
 
+class GreaterElementParse(ParseTool):
+    
+    def __init__(self, doc_parser, start, end, parent_tree_node):
+        super().__init__(doc_parser, start, end, parent_tree_node)
+
+    def parse(self):
+        pos = self.start
+        end = self.end
+        self.short_id = fr"GenELem\@{pos}"
+        self.logger.info(self.match_log_format, self.short_id, "List", "parsing starting")
+        last_sub_start = pos - 1
+        last_sub_end = pos - 1
+        tool_box = ToolBox(self.doc_parser)
+        self.tree_node = self.parent_tree_node
+        while pos < end + 1:
+            elem  = tool_box.next_greater_element(pos, end)
+            if elem:
+                self.logger.debug('%s found inner element %s at %d', str(self),
+                                  elem['match_type'],
+                                  elem['match_line'])
+                parse_tool = elem['parse_tool']
+                match_pos = elem['match_line']
+                if match_pos > last_sub_end:
+                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1, self.tree_node)
+                    self.doc_parser.push_parser(para)
+                    para.parse()
+                    self.doc_parser.pop_parser(para)
+                if "end_match" in elem:
+                    sub_end = elem['end_match']['pos']
+                else:
+                    sub_end = end
+                parser = parse_tool(self.doc_parser, match_pos, sub_end, self.tree_node)
+                self.doc_parser.push_parser(parser)
+                sub_start = match_pos
+                sub_end = parser.parse()
+                self.doc_parser.pop_parser(parser)
+                pos = sub_end + 1
+                last_sub_start = match_pos
+                last_sub_end = sub_end
+            else:
+                # no more elements in range, so make a para
+                if last_sub_end < self.end:
+                    self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
+                                      last_sub_end + 1, self.end)
+                    para = ParagraphParse(self.doc_parser, last_sub_end + 1, end, self.tree_node)
+                    self.doc_parser.push_parser(para)
+                    para.parse()
+                    self.doc_parser.pop_parser(para)
+                    pos = end + 1
+        return end
+
+class QuoteParse(GreaterElementParse):
+
+    def parse(self):
+        # want to strip the wrapper lines
+        wrap_start = self.start
+        wrap_end = self.end
+        elem_start = wrap_start + 1
+        elem_end = wrap_end - 1
+        self.start = elem_start
+        self.end = elem_end
+        parent_node = self.parent_tree_node
+        self.parent_tree_node = QuoteBlock(parent_node)
+        res = super().parse()
+        self.parent_tree_node = parent_node 
+        self.start = wrap_start
+        self.end = wrap_end
+        return self.end
+        
+class CenterParse(GreaterElementParse):
+
+    def parse(self):
+        # want to strip the wrapper lines
+        wrap_start = self.start
+        wrap_end = self.end
+        elem_start = wrap_start + 1
+        elem_end = wrap_end - 1
+        self.start = elem_start
+        self.end = elem_end
+        parent_node = self.parent_tree_node
+        self.parent_tree_node = CenterBlock(parent_node)
+        res = super().parse()
+        self.parent_tree_node = parent_node 
+        self.start = wrap_start
+        self.end = wrap_end
+        return self.end
+        
 class ListParse(ParseTool):
 
-    def __init__(self, doc_parser, start, end):
-        super().__init__(doc_parser, start, end)
+    def __init__(self, doc_parser, start, end, parent_tree_node):
+        super().__init__(doc_parser, start, end, parent_tree_node)
         self.list_type = None
         self.start_value = None
         self.margin = 0
@@ -355,7 +443,6 @@ class ListParse(ParseTool):
         }
 
     def parse(self):
-        parent_parser = self.doc_parser.get_parser_parent(self)
         pos = self.start
         end = self.end
         self.short_id = fr"List\@{pos}"
@@ -415,9 +502,11 @@ class ListParse(ParseTool):
                     spaces_per_level = match_res['lindent'] - self.margin
             else:
                 if last_match_pos is not None:
-                    # these lines will be parsed to collect whatever is contained by
-                    # the item, since it is a greater element.
-                    if ends_on_blanks and pos == self.list_end - 2:
+                    # These lines will be parsed to collect whatever is contained by
+                    # the item, since it is a greater element. Fence post issues
+                    # here reading the code, self.list_end - 1 skips the last
+                    # two blank lines
+                    if ends_on_blanks and pos == self.list_end - 1:
                         # don't add the blanks to the cotent of the last item
                         continue
                     match_records[last_match_pos]['extra_lines'].append(pos)
@@ -453,7 +542,7 @@ class ListParse(ParseTool):
                     parent_rec['children'] = []
                 parent_rec['children'].append(rec)
 
-        the_list = self.do_one_level(parent_parser.tree_node, top_level_records)
+        the_list = self.do_one_level(self.parent_tree_node, top_level_records)
         if ends_on_blanks:
             BlankLine(the_list)
             BlankLine(the_list)
@@ -515,41 +604,10 @@ class ListParse(ParseTool):
             start = xtra[0]
             end = xtra[-1]
             pos = start
-            last_sub_start = pos - 1
-            last_sub_end = pos - 1
-            gaps = []
-            self.tree_node = item
-            while pos < end + 1:
-                elem  = tool_box.next_greater_element(pos, end)
-                if elem:
-                    self.logger.debug('%s found inner element %s at %d', str(self),
-                                      elem['match_type'],
-                                      elem['match_line'])
-                    parse_tool = elem['parse_tool']
-                    match_pos = elem['match_line']
-                    if match_pos > last_sub_end:
-                        para = ParagraphParse(self.doc_parser, last_sub_end + 1, match_pos - 1)
-                        self.doc_parser.push_parser(para)
-                        para.parse()
-                        self.doc_parser.pop_parser(para)
-                    parser = parse_tool(self.doc_parser, match_pos, end)
-                    self.doc_parser.push_parser(parser)
-                    sub_start = match_pos
-                    sub_end = parser.parse()
-                    self.doc_parser.pop_parser(parser)
-                    pos = sub_end + 1
-                    last_sub_start = match_pos
-                    last_sub_end = sub_end
-                else:
-                    # no more elements in range, so make a para
-                    if last_sub_end < self.end:
-                        self.logger.debug('%s found inner element making new paragraph for %d to %d', str(self),
-                                          last_sub_end + 1, self.end)
-                        para = ParagraphParse(self.doc_parser, last_sub_end + 1, end)
-                        self.doc_parser.push_parser(para)
-                        para.parse()
-                        self.doc_parser.pop_parser(para)
-                        pos = end + 1
+            gep = GreaterElementParse(self.doc_parser, start, end, item)
+            self.doc_parser.push_parser(gep)
+            gep.parse()
+            self.doc_parser.pop_parser(gep)
         
     def list_line_get_type(self, line):
         # check def_list first, looks like unordered too
@@ -580,25 +638,16 @@ class ListParse(ParseTool):
             'tag': parts.get('tag'),             # For def lists, None otherwise
             'contents': parts['contents'] or ''  # Rest of line, empty if None
         }
-
-
-    
         
 class ParagraphParse(ParseTool):
 
-    def __init__(self, doc_parser, start, end, tree_parent=None):
-        super().__init__(doc_parser, start, end)
+    def __init__(self, doc_parser, start, end, parent_tree_node):
+        super().__init__(doc_parser, start, end, parent_tree_node)
         self.start = start
         self.end = end
-        self.tree_parent = tree_parent
         self.logger = logging.getLogger('roam2doc-parser')
         
     def parse(self):
-        parent = self.get_parent_parser()
-        if self.tree_parent:
-            parent_node = self.tree_parent
-        else:
-            parent_node = parent.tree_node
         pos = self.start
         end = self.end
         any = False
@@ -607,15 +656,15 @@ class ParagraphParse(ParseTool):
         while pos < self.end + 1 and not any:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if line.strip() == "":
-                    BlankLine(parent_node)
+                    BlankLine(self.parent_tree_node)
                     pos += 1
                 else:
                     any = True
                     break
         if pos > self.end:
             return
-        self.tree_node = para = Paragraph(parent_node)
-        self.logger.debug('Adding paragraph to parser %s', parent)
+        self.tree_node = para = Paragraph(self.parent_tree_node)
+        self.logger.debug('Adding paragraph to parser %s', self)
         # find all the paragraphs first
         ranges = []
         start_pos =  pos
@@ -641,7 +690,7 @@ class ParagraphParse(ParseTool):
         index = 0
         for r_spec in ranges:
             if index > 0:
-                para = Paragraph(parent_node)
+                para = Paragraph(self.parent_tree_node)
             index += 1
             line_index = r_spec[0]
             for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
@@ -892,7 +941,7 @@ class MatchQuote(LineRegexAndEndMatch):
         super().__init__(self.patterns, self.end_pattern)
 
     def get_parse_tool(self):
-        return ParagraphParse
+        return QuoteParse
         
 class MatchCenter(LineRegexAndEndMatch):
     patterns = [re.compile(r'^[ \t]*\#\+BEGIN_CENTER', re.IGNORECASE),]
@@ -902,7 +951,7 @@ class MatchCenter(LineRegexAndEndMatch):
         super().__init__(self.patterns, self.end_pattern)
     
     def get_parse_tool(self):
-        return ParagraphParse
+        return CenterParse
     
 class MatchExample(LineRegexAndEndMatch):
     patterns = [re.compile(r'^[ \t]*\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
@@ -1017,6 +1066,20 @@ class ToolBox:
                                start_char=match_res['start'],
                                end_char=match_res['end'],
                                matched_contents=matched.groupdict())
+                    if hasattr(matcher, 'match_end_line') and callable(getattr(matcher, 'match_end_line')):
+                        subpos = pos + 1
+                        for subline in self.doc_parser.lines[subpos:end+1]:
+                            end_matched = matcher.match_end_line(subline)
+                            if end_matched:
+                                ressub = dict(match_type=match_type,
+                                              pos=subpos,
+                                              parse_tool=parse_tool,
+                                              match_line=subpos,
+                                              start_char=end_matched['start'],
+                                              end_char=end_matched['end'],
+                                              end_matched_contents=end_matched['groupdict'])
+                                res['end_match'] = ressub
+                            subpos += 1
                     return res
                 # lesser elements
             pos += 1
