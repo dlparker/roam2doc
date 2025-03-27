@@ -11,6 +11,7 @@ class Root:
         # Always exactly one branch as trunk, others attach to it or each other
         self.trunk = Branch(self, source)
         self.link_targets = {}
+        self.css_classes = {}
 
     def new_node_id(self):
         self.node_id += 1

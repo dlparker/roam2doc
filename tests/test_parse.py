@@ -3,6 +3,7 @@ import logging
 import json
 from pathlib import Path
 from pprint import pprint, pformat
+from bs4 import BeautifulSoup
 import pytest
 from roam2doc.parse import (DocParser, MatchHeading, MatchDoubleBlank, MatchTable, MatchList,
                             MatchSrc, MatchQuote, MatchCenter, MatchExample, MatchGreaterEnd,
@@ -146,8 +147,26 @@ def flat_list_inner(list_type="ordered", use_objects=False, append_para=False, a
     assert isinstance(ol.children[0], OrderedListItem)
     assert isinstance(ol.children[1], OrderedListItem)
     assert isinstance(ol.children[2], OrderedListItem)
+    html_lines = ol.to_html(indent_level=1)
+    pre = "<body>"
+    post = "</body>"
+    new_list = []
+    new_list.append(pre)
+    new_list.extend(html_lines)
+    new_list.append(post)
+    html = '\n'.join(new_list)
+    print(html)
+    soup = BeautifulSoup(html, 'html.parser')
+    elements = soup.find_all('li', class_="org-auto-OrderedListItem")
+    for elm in elements:
+        for kid in elm.descendants:
+            if kid.string == "\n":
+                continue
+            if kid.string is None:
+                # if something is appended, it will be here
+                break
+            assert "(flat)" in kid.string
 
-    
     
 def test_bad_file_properties():
     frag_file =  "file_start_with_bad_props.org"
