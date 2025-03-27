@@ -205,12 +205,9 @@ class BlankLine(Node):
     
 class Container(Node):
     """ This node contains one or more other nodes but does not directly contain text."""
-    def __init__(self, parent, content=None):
+    def __init__(self, parent):
         super().__init__(parent)
         self.children = []
-        if content:
-            for item in content:
-                item.move_to_parent(self)
         
     def add_node(self, node):
         if node not in self.children:
@@ -394,8 +391,8 @@ class LinkTarget():
 
 class TextTag(Container):
 
-    def __init__(self, parent, simple_text, content=None):
-        super().__init__(parent, content)
+    def __init__(self, parent, simple_text):
+        super().__init__(parent)
         self.simple_text = simple_text
     
     def get_css_styles(self):
