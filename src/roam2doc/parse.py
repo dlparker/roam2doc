@@ -25,7 +25,8 @@ class DocParser:
             root = Root(self.source)
             self.branch = root.trunk
         else:
-            self.branch = Branch(root.trunk, self.source)
+            self.branch = Branch(root, self.source, root.trunk)
+            root.trunk.add_node(self.branch)
         self.root = root
         self.doc_properties = None
         self.doc_title = None
@@ -173,10 +174,15 @@ class DocParser:
                              len(self.lines))
             self.push_parser(section)
             section.parse()
+            if index == 0:
+                if self.doc_properties is not None:
+                    if "ID" in self.doc_properties:
+                        raw = self.doc_properties['ID']
+                        self.root.add_link_target(section.tree_node, raw.lstrip())
             self.pop_parser(section)
             index += 1
-        result = dict(sections=self.sections, title=self.doc_title, properties=self.doc_properties)
-        return result
+        return self.branch
+
 
     def parse_properties(self, start, end):
         # :PROPERTIES:
@@ -1295,7 +1301,7 @@ class ToolBox:
                     tree_item = Image(tree_node, str(path), desc)
                 else:
                     # If we can't make it into an image, just assume
-                    # it is an internal link
+                    # it is an internal link, give special treatment
                     tree_item = InternalLink(tree_node, target_text, None)
                     items = self.get_text_and_object_nodes_in_line(tree_item, desc)
         #elif item['matcher_type'] == MatcherType.image_object:

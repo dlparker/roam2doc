@@ -480,16 +480,36 @@ def gen_big_mix():
     
 def test_1():
     lines = []
+    lines.append(':PROPERTIES:')
+    lines.append(':ID: 0000-1111')
+    lines.append(':END:')
     lines.append('* A heading with *bold*!')
     lines.append('** A sub heading with */bold italiacs/* !')
     lines.append('')
     lines.append('* Section 2* !')
+    lines.append(':PROPERTIES:')
+    lines.append(':ID: 0000-2222')
+    lines.append(':END:')
     lines.append('[[target][*/bold iti/*]]')
     lines.append('')
     lines.append('<<target>>')
     
     buff = '\n'.join(lines)
 
+    lines_2 = []
+    lines_2.append('* Section one heading for doc two')
+    lines_2.append('')
+    lines_2.append('[[id:0000-1111][ID style link to doc one at file level]]')
+    lines_2.append('[[id:0000-2222][ID style link to doc one at section 2 by property drawer]]')
+    lines_2.append('')
+
+    
+    buff_2 = '\n'.join(lines_2)
     doc_parser = DocParser(buff, "inline")
-    doc_parser.parse()
-    print(doc_parser.root.to_html())
+    b1 = doc_parser.parse()
+
+    doc_parser2 = DocParser(buff_2, "inline2", root=doc_parser.root)
+    b2 = doc_parser2.parse()
+    
+    #print(json.dumps(b2.to_json_dict(), indent=2))
+    print('\n'.join(b1.to_html(0)))

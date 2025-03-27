@@ -23,6 +23,10 @@ class Root:
     def get_link_target(self, target_id):
         if target_id in self.link_targets:
             return self.link_targets[target_id].target_node
+        if target_id.startswith('id:'):
+            new_target_id = target_id[3:]
+            if new_target_id in self.link_targets:
+                return self.link_targets[new_target_id].target_node
         # could be just a heading text
         return self.find_heading_match(target_id)
         
@@ -103,7 +107,7 @@ class Branch:
         self.source = source
         if parent is None:
             parent = root
-        self.parent = parent # could be attatched to a trunk branch, not the root
+        self.parent = parent # could be attatched to a trunk branch, not just the root
         self.children = []
 
     def find_root(self):

@@ -8,8 +8,8 @@
 :PROPERTIES:
 :ID: 00000000-0000-0000-0000-000000000002
 :END:
-* Section 1 heading and it has */some/* ~objects~
-** Section 1 subsection 1 heading and it also has */some/* ~objects~
+* Section 1 heading
+** Section 1 subsection 1 heading and it has */some/* ~objects~
 *** level 3 section
 **** level 4 section
 ***** level 5 section
@@ -179,7 +179,7 @@ quoted text with cite
 :PROPERTIES:
 :ID: 00000000-0000-0000-0000-000000000200
 :END:
-*okay*
+ *okay*
 
 +---+---+---+
 | a | b | c |
