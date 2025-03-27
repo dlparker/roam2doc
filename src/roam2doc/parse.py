@@ -12,7 +12,7 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
-                         Table, TableRow, TableCell, Link, Image, InternalLink)
+                         Table, TableRow, TableCell, Link, InternalLink)
 
 class DocParser:
 
@@ -807,14 +807,6 @@ class LineRegexMatch:
                             matched=sr)
         return False
 
-    def match_line_range(self, lines, start, end):
-        matches = []
-        for line in lines[start, end+1]:
-            m = self.match_line(line)
-            if m:
-                matches.append(m)
-        return matches
-    
     def get_parse_tool(self):
         raise NotImplementedError
     
@@ -832,7 +824,7 @@ class ObjectRegexMatch:
     def match_text(self, text, first_only=False):
         matches = []
         for re in self.patterns:
-            for m in re.finditer(text):
+            for m in re.finditer(text): 
                 matched = dict(start=m.start(),
                                end=m.end(),
                                groupdict=m.groupdict(),
@@ -892,7 +884,20 @@ class InternalLinkObjectMatcher(ObjectRegexMatch):
     
     def __init__(self):
         super().__init__(self.patterns)
-        
+
+"""
+I can't figure out how to deal with image references. They look just like
+links to regexp, unless you use the format [[file:./foo.jpg][altvalue]]
+and that doesn't work very well if you are converting to html, so I am just
+not going to support them unless I can figure out some clever way to
+tell the difference.
+class ImageObjectMatcher(ObjectRegexMatch):
+    patterns = [re.compile(r'\[\[file:(?P<image>.+?)\](?:\[(?P<alt>.+?)\])?\]'),]
+    
+    def __init__(self):
+        super().__init__(self.patterns)
+"""
+
 class MatchHeading(LineRegexMatch):
     patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
 
@@ -912,23 +917,6 @@ class MatchHeading(LineRegexMatch):
     def get_parse_tool(self):
         return SectionParse
 
-class MatchDoubleBlank(LineRegexMatch):
-    patterns = [re.compile(r"^[ \t].*$"),]
-
-    def __init__(self):
-        super().__init__(self.patterns)
-
-    def match_line_range(self, lines, start, end):
-        first = -2
-        pos = start
-        for line in lines[start:end+1]:
-            m = self.match_line(line)
-            if first == pos - 1:
-                return dict(start=first, end=pos)
-            first = pos
-            pos += 1
-        return None
-    
 class MatchTable(LineRegexMatch):
     patterns = [re.compile(r"^[ \t]*\|[ \t]*"),
                 re.compile(r"^[ \t]*\+-.*")]
@@ -1080,15 +1068,6 @@ class MatchExport(LineRegexAndEndMatch):
         return ExportParse
     
 
-class MatchGreaterEnd:
-    
-    def match_line_range(self, doc_parser, lines, start, end):
-        pos = start
-        tool_box = ToolBox(self.doc_parser)
-        next_elem = tool_box.get_next_element(pos, end)
-        return next_elem
-
-
 class ListType(str, Enum):
 
     ordered_list = "ORDERED_LIST"
@@ -1126,6 +1105,7 @@ class MatcherType(str, Enum):
     verbatim_object = "VERBATIM_OBJECT"
     target_object = "TARGET_OBJECT"
     internal_link_object = "INTERNAL_LINK_OBJECT"
+    #image_object = "IMAGE_OBJECT"
 
     def __str__(self):
         return self.value
@@ -1138,8 +1118,6 @@ class ToolBox:
                         MatcherType.center_block:MatchCenter(),
                         }
     
-    greater_end_matchers = {MatcherType.greater_end: MatchGreaterEnd(),
-                            }
     # lesser elements
     lesser_matchers = {MatcherType.example_block:MatchExample(),
                        MatcherType.code_block:MatchCode(),
@@ -1155,11 +1133,11 @@ class ToolBox:
                        MatcherType.verbatim_object:VerbatimObjectMatcher(),
                        MatcherType.target_object:TargetObjectMatcher(),
                        MatcherType.internal_link_object:InternalLinkObjectMatcher(),
+                       #MatcherType.image_object:ImageObjectMatcher(),
                        }
     @classmethod
     def get_matcher_dict(cls):
         res = dict(cls.greater_matchers)
-        res.update(cls.greater_end_matchers)
         res.update(cls.lesser_matchers)
         res.update(cls.object_matchers)
         return res
@@ -1285,7 +1263,9 @@ class ToolBox:
     def do_object_parts(self, item, tree_node):
         simple_text = None
         if "inner_objects" not in item:
-            if item['matcher_type'] != MatcherType.internal_link_object:
+            #rejects = [MatcherType.internal_link_object,  MatcherType.image_object]
+            rejects = [MatcherType.internal_link_object,]
+            if item['matcher_type'] not in rejects :
                 simple_text = item['matched'].groupdict()['text']
         tree_item = self.add_object_item(tree_node, item, simple_text)
         if "inner_objects" not in item:
@@ -1315,5 +1295,9 @@ class ToolBox:
             desc = item['matched'].groupdict()['description']
             tree_item = InternalLink(tree_node, target_text, None)
             items = self.get_text_and_object_nodes_in_line(tree_item, desc)
+        #elif item['matcher_type'] == MatcherType.image_object:
+            #src_text = item['matched'].groupdict()['image']
+            #alt_text = item['matched'].groupdict()['alt']
+            #tree_item = Image(tree_node, src_text, alt_text)
         return tree_item
         

@@ -5,7 +5,7 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
-                         Table, TableRow, TableCell, Link, Image, InternalLink)
+                         Table, TableRow, TableCell, InternalLink, Link)
 
 
 def build_tree_1():
@@ -108,11 +108,12 @@ def build_tree_1():
     bits2 = [Text(root, "Value"),  TargetText(root, "Target 3"), Text(root, "2")]
     t1r2c2 = TableCell(t1r2, bits2)
 
+    """
     image_section = Section(root.trunk, heading_text="Image Section")
     image_1 = Image(image_section,
                     "https://fastly.picsum.photos/id/965/200/300.jpg?hmac=16gh0rrQrvUF3RJa52nRdq8hylkBd-pL4Ff9kqsNRDQ",
                     "a pretty picture")
-    
+    """
     link_section = Section(root.trunk, heading_text="Link Section")
     link_1 = Link(link_section, "https://x.com", "Link to X")
     BlankLine(link_section)

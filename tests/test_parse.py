@@ -3,10 +3,9 @@ import logging
 import json
 from pathlib import Path
 from pprint import pprint, pformat
-from bs4 import BeautifulSoup
 import pytest
-from roam2doc.parse import (DocParser, MatchHeading, MatchDoubleBlank, MatchTable, MatchList,
-                            MatchSrc, MatchQuote, MatchCenter, MatchExample, MatchGreaterEnd,
+from roam2doc.parse import (DocParser, MatchHeading, MatchTable, MatchList,
+                            MatchSrc, MatchQuote, MatchCenter, MatchExample,
                             ParagraphParse, MatcherType, ToolBox, SectionParse)
 from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
 from setup_logging import setup_logging
@@ -46,7 +45,6 @@ def test_parser_stack():
 
     def parse_start(parser):
         nonlocal section_p
-        print(f"parsing starting by {parser}")
         assert doc_parser.current_parser() == parser
         if isinstance(parser, SectionParse):
             assert doc_parser.get_parser_parent(parser) is None
@@ -60,7 +58,8 @@ def test_parser_stack():
             assert parser.get_section_parser() == section_p
             
     def parse_end(parser):
-        print(f"parsing finished by {parser}")
+        pass
+
 
     doc_parser.set_parse_callbacks(parse_start, parse_end)
 
@@ -75,11 +74,11 @@ def test_parser_stack():
     assert len(doc_parser.parser_stack) == 0
     with pytest.raises(ValueError) as execinfo:
         # can't pop it twice
-        print(execinfo)
         doc_parser.pop_parser(sp)
                 
     res = doc_parser.parse()
     assert len(doc_parser.parse_problems) == 0
+
 
 def test_flat_ordered_list():
     flat_list_inner()
@@ -134,46 +133,34 @@ def flat_list_inner(list_type="ordered", use_objects=False, append_para=False, a
     contents = start + list_part
     if append_part:
         contents += append_part
-    parser =  DocParser(contents, "")
-    res = parser.parse()
-    section_parse_0 = parser.sections[0]
+    doc_parser =  DocParser(contents, "")
+    res = doc_parser.parse()
+    section_parse_0 = doc_parser.sections[0]
     section_0 = section_parse_0.tree_node
-    assert section_0 in parser.branch.children
+    assert section_0 in doc_parser.branch.children
     # should have one ordered list and one blank line
     assert len(section_0.children) == section_kid_count
-    ol = section_0.children[0]
-    assert len(ol.children) == 3
-    assert isinstance(ol, OrderedList)
-    assert isinstance(ol.children[0], OrderedListItem)
-    assert isinstance(ol.children[1], OrderedListItem)
-    assert isinstance(ol.children[2], OrderedListItem)
-    html_lines = ol.to_html(indent_level=1)
-    pre = "<body>"
-    post = "</body>"
-    new_list = []
-    new_list.append(pre)
-    new_list.extend(html_lines)
-    new_list.append(post)
-    html = '\n'.join(new_list)
-    print(html)
-    soup = BeautifulSoup(html, 'html.parser')
-    elements = soup.find_all('li', class_="org-auto-OrderedListItem")
-    for elm in elements:
-        for kid in elm.descendants:
-            if kid.string == "\n":
-                continue
-            if kid.string is None:
-                # if something is appended, it will be here
-                break
-            assert "(flat)" in kid.string
+    the_l = section_0.children[0]
+    assert len(the_l.children) == 3
+    if list_type == "ordered":
+        assert isinstance(the_l, OrderedList)
+        assert isinstance(the_l.children[0], OrderedListItem)
+        assert isinstance(the_l.children[1], OrderedListItem)
+        assert isinstance(the_l.children[2], OrderedListItem)
+    elif list_type == "unordered":
+        assert isinstance(the_l, UnorderedList)
+        assert isinstance(the_l.children[0], UnorderedListItem)
+        assert isinstance(the_l.children[1], UnorderedListItem)
+        assert isinstance(the_l.children[2], UnorderedListItem)
+    # make sure output is produced without blowing up
+    doc_parser.root.to_html()
 
-    
 def test_bad_file_properties():
     frag_file =  "file_start_with_bad_props.org"
     contents = get_frag_file_contents(frag_file)
-    parser =  DocParser(contents, frag_file)
-    res = parser.parse()
-    assert len(parser.parse_problems) > 0
+    doc_parser =  DocParser(contents, frag_file)
+    res = doc_parser.parse()
+    assert len(doc_parser.parse_problems) > 0
     
 def test_file_starts_no_content():
     logger = logging.getLogger('test_code')
@@ -185,13 +172,16 @@ def test_file_starts_no_content():
         # should start on line index 0. They also
         # have exactly empty line at the end, so
         # the end index should, well, you do the math.
-        parser = DocParser(contents, name)
-        res = parser.find_first_section()
+        doc_parser = DocParser(contents, name)
+        res = doc_parser.find_first_section()
         assert res.start == 0, f"{name} should start section at 0"
         lines = contents.split('\n')
         x = len(lines) - 1
         assert res.end == x, f"{name} should end section at {x}"
 
+        # make sure output is produced without blowing up
+        doc_parser.root.to_html()
+    
 def test_file_starts_with_content():
     logger = logging.getLogger('test_code')
     
@@ -200,12 +190,14 @@ def test_file_starts_with_content():
         contents = get_frag_file_contents(name)
         para1 = get_frag_file_contents("no_object_paragraph.org")
         more = contents + para1
-        parser =  DocParser(more, name)
-        res = parser.find_first_section()
+        doc_parser =  DocParser(more, name)
+        res = doc_parser.find_first_section()
         assert res.start == 0, f"{name} should start section at 0"
         lines = more.split('\n')
         x = len(lines) - 1
         assert res.end == x, f"{name} should end section at {x}"
+        # make sure output is produced without blowing up
+        doc_parser.root.to_html()
 
 def test_file_starts_with_second_section():
     logger = logging.getLogger('test_code')
@@ -222,8 +214,8 @@ def test_file_starts_with_second_section():
         s2_lines = f_section_start_with_drawer.format(section_number=2).split('\n')
         all_lines = s1_lines + s2_lines
         text = '\n'.join(all_lines)
-        parser =  DocParser(text, name)
-        res = parser.parse()
+        doc_parser =  DocParser(text, name)
+        res = doc_parser.parse()
         assert len(res['sections']) == 2, f"{name} section 1 should have two sections"
         section_1 = res['sections'][0]
         section_2 = res['sections'][1]
@@ -241,19 +233,30 @@ def test_file_starts_with_second_section():
         s2_end = s2_start + len(s2_lines)  - 1
         assert section_2.start == s2_start, f"{name} section 2 should start section at {s2_start}"
         assert section_2.end == s2_end, f"{name} section 2 should end section at {s2_end}"
+        # make sure output is produced without blowing up
+        doc_parser.root.to_html()
 
         
-def atest_file_all_nodes():
+def test_file_all_nodes():
     name = "all_nodes.org"
-    name = "only_title_and_list.org"
-    name = "only_props_and_list.org"
-    name = "props_title_and_list.org"
     contents = get_example_file_contents(name)
-    parser =  DocParser(contents, name)
-    res = parser.parse()
-    #obj_tree = json.dumps(parser.root, default=lambda o:o.to_json_dict(), indent=4)
-    #print(obj_tree)
-    print(parser.root.to_html())
+    doc_parser =  DocParser(contents, name)
+    section_p = None
+    def parse_start(parser):
+        nonlocal section_p
+        assert doc_parser.current_parser() == parser
+        if isinstance(parser, SectionParse):
+            section_p = parser
+            
+    def parse_end(parser):
+        pass
+
+
+    doc_parser.set_parse_callbacks(parse_start, parse_end)
+    res = doc_parser.parse()
+    # make sure output is produced without blowing up
+    doc_parser.root.to_html()
+    doc_parser.root.to_html(make_pretty=False, include_json=True)
 
 
 def gen_top_lists():

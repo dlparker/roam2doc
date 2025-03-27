@@ -7,9 +7,6 @@
 7. [ ] Document object parsing limitations, just name what is parsed and where
    1. Bold text not allowed in headings, heading will be converted to regular/bold text
    2. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
-   3. Nested definition lists are not nested when converted to html. Some controversy on what is right
-   4. Nested object syntax is not supported. e.g. <<*bold_target*>> will probably produce the words "bold target" in both forms on output
-   5. Nested object syntax in link descrption (second) part is not currently supported. Might someday, maybe
 8. [ ] Write tests for regex tools
 9. [ ] Get margin for everthing and figure out how to apply css to duplicate it. Best effort, not everything.
 10. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback
@@ -19,10 +16,3 @@
 14. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
 15. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
    
-=some = middle text = code=
-
-+ foo
-+ bar :: foxs
-  + boo :: sjlkj
-  + 
-+ sss :: hoh!

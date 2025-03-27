@@ -394,7 +394,7 @@ class LinkTarget():
 
 class TextTag(Container):
 
-    def __init__(self, parent, simple_text=None, content=None):
+    def __init__(self, parent, simple_text, content=None):
         super().__init__(parent, content)
         self.simple_text = simple_text
     
@@ -405,15 +405,8 @@ class TextTag(Container):
         lines = []
         indent_level += 1
         padding, line1 = setup_tag_open(f"{self.tag}", indent_level, self)
-        if self.simple_text:
-            line1 += f">{self.simple_text}</{self.tag}>"
-            lines.append(line1)
-            return lines
-        line1 += ">"
+        line1 += f">{self.simple_text}</{self.tag}>"
         lines.append(line1)
-        for node in self.children:
-            lines.extend(node.to_html(indent_level))
-        lines.append(padding + f"</{self.tag}>")
         return lines
     
 class BoldText(TextTag):
@@ -719,18 +712,7 @@ class Link(Container):
         self.display_text = display_text
 
     def to_html(self, indent_level):
-        lines = []
-        indent_level += 1
-        padding, line1 = setup_tag_open("a", indent_level, self)
-        line1 += f' href="{self.target_text}">'
-        lines.append(line1)
-        if self.display_text:
-            lines.append(padding + "   " + self.display_text)
-        elif len(self.children) > 0:
-            for child in self.children:
-                lines.extend(child.to_html())
-        lines.append(padding + '</a>')
-        return lines
+        raise NotImplementedError
 
     def to_json_dict(self):
         ## fiddle the resluts around to make it easier to understand
@@ -783,6 +765,12 @@ class InternalLink(Link):
         res['props']['target_node'] = str(target)
         return res
         
+"""
+I can't figure out how to deal with image references. They look just like
+links to regexp, unless you use the format [[file:./foo.jpg][altvalue]]
+and that doesn't work very well if you are converting to html, so I am just
+not going to support them unless I can figure out some clever way to
+tell the difference.
 class Image(Node):
     
     def __init__(self, parent, src_text, alt_text=None):
@@ -809,6 +797,7 @@ class Image(Node):
         res = dict(cls=superres['cls'], props=lres)
         return res
 
+"""
 
 def setup_tag_open(tag, indent_level, obj):
     root = obj.find_root()

@@ -178,4 +178,15 @@ def t4():
     doc_parser.parse()
     print(doc_parser.root.to_html())
 
-t2()
+def t5():
+    this_dir = Path(__file__).resolve().parent
+    fdir = Path(this_dir, "tests", "org_files", "examples")
+    target = Path(fdir, "all_nodes.org")
+    with open(target) as f:
+        buff = f.read()
+    doc_parser = DocParser(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())
+    
+
+t5()
