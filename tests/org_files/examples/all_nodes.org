@@ -10,6 +10,7 @@
 :END:
 * Section 1 heading
 
+=verbatim text=
 
 This will be a <<paragraph>>.
 This continues the paragraph.
@@ -131,11 +132,7 @@ _underlined text_
 
 +line-through text+
 
-=inline code=
 
-=
-How does this handle = signs in the code?
-=
 
 ~monospace text~
 

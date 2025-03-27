@@ -422,13 +422,13 @@ class LinethroughText(TextTag):
     tag = 's'
 
 class InlineCodeText(TextTag):
-    tag = '<code>'
+    tag = 'code'
 
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
     
 class VerbatimText(TextTag):
-    tag = '<code>'
+    tag = 'code'
 
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]

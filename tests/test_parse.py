@@ -5,7 +5,7 @@ from pathlib import Path
 from pprint import pprint, pformat
 import pytest
 from roam2doc.parse import (DocParser, MatchHeading, MatchTable, MatchList,
-                            MatchSrc, MatchQuote, MatchCenter, MatchExample,
+                            MatchQuote, MatchCenter, MatchExample,
                             ParagraphParse, MatcherType, ToolBox, SectionParse)
 from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
 from setup_logging import setup_logging

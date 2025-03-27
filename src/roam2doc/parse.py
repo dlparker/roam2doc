@@ -448,8 +448,6 @@ class CenterParse(WrappedGEParse):
         self.tree_class = CenterBlock
 
 class LesserElementParse(ParseTool):
-    tree_class = None
-    text_inside = False
     
     def __init__(self, doc_parser, start, end, parent_tree_node):
         super().__init__(doc_parser, start, end, parent_tree_node)
@@ -462,11 +460,7 @@ class LesserElementParse(ParseTool):
         start = self.start + 1
         end = self.end -1
         buff = '\n'.join(self.doc_parser.lines[start:end + 1])
-        if self.text_inside:
-            tree_node = self.tree_class(self.parent_tree_node)
-            Text(tree_node, buff)
-        else:
-            self.tree_class(self.parent_tree_node, buff)
+        tree_node = self.tree_class(self.parent_tree_node, buff)
         if self.end_callback:
             self.end_callback(self)
         return self.end
@@ -475,24 +469,28 @@ class ExampleParse(LesserElementParse):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.text_inside = False
         self.tree_class = ExampleBlock
     
 class CodeParse(LesserElementParse):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.text_inside = True
         self.tree_class = CodeBlock
     
 class CommentParse(LesserElementParse):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.text_inside = False
         self.tree_class = CommentBlock
     
 class ExportParse(LesserElementParse):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.text_inside = False
         self.tree_class = ExportBlock
     
 class ListParse(ParseTool):
@@ -998,17 +996,9 @@ class LineRegexAndEndMatch(LineRegexMatch):
                         matched=sr)
         return False
     
-class MatchSrc(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_SRc\s*(?P<language>\w+.)?', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_SRC', re.IGNORECASE)
-
-    def __init__(self):
-        super().__init__(self.patterns, self.end_pattern)
-
-    
 class MatchQuote(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_QUOTE\s*(?P<cite>\w+.*)?', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_QUOTE', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_QUOTE', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_QUOTE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -1017,8 +1007,8 @@ class MatchQuote(LineRegexAndEndMatch):
         return QuoteParse
         
 class MatchCenter(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_CENTER', re.IGNORECASE),]
-    end_pattern = re.compile(r'[ \t]*^\#\+END_CENTER', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_CENTER', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_CENTER', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -1027,8 +1017,8 @@ class MatchCenter(LineRegexAndEndMatch):
         return CenterParse
     
 class MatchExample(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_EXAMPLE', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_EXAMPLE', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_EXAMPLE', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -1038,18 +1028,18 @@ class MatchExample(LineRegexAndEndMatch):
     
 
 class MatchCode(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_SRC', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_SRC', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_SRC', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_SRC', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
 
     def get_parse_tool(self):
-        return CommentParse
+        return CodeParse
     
 class MatchComment(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_COMMENT', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_COMMENT', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_COMMENT', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_COMMENT', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -1058,8 +1048,8 @@ class MatchComment(LineRegexAndEndMatch):
         return ExportParse
     
 class MatchExport(LineRegexAndEndMatch):
-    patterns = [re.compile(r'^[ \t]*\#\+BEGIN_EXPORT', re.IGNORECASE),]
-    end_pattern = re.compile(r'^[ \t]*\#\+END_EXPORT', re.IGNORECASE)
+    patterns = [re.compile(r'^\#\+BEGIN_EXPORT', re.IGNORECASE),]
+    end_pattern = re.compile(r'^\#\+END_EXPORT', re.IGNORECASE)
 
     def __init__(self):
         super().__init__(self.patterns, self.end_pattern)
@@ -1189,6 +1179,7 @@ class ToolBox:
                                               end_char=end_matched['end'],
                                               end_matched_contents=end_matched['groupdict'])
                                 res['end_match'] = ressub
+                                break
                             subpos += 1
                     return res
             # line unmatched, see if it right format for a keyword
