@@ -10,6 +10,17 @@
 :END:
 * Section 1 heading
 
+1. some *bold* text
+2. some /italic/ text 
+
+
+1. [[http://example.com]]
+2. [[https://example.com][Link Title]]
+3. [[image_links][Link to list containing images]]
+
+   
+
+
 =verbatim text=
 
 This will be a <<paragraph>>.
@@ -116,13 +127,6 @@ a link [[Section 1 heading][*/back to the top!/*]]
 this text is in section 6
 
        
-[[http://example.com][Link Title]]
-[[https://example.com][Link Title]]
-[[http://example.com]]
-[[https://example.com]]
-
-[[https://fastly.picsum.photos/id/965/200/300.jpg?hmac=16gh0rrQrvUF3RJa52nRdq8hylkBd-pL4Ff9kqsNRDQ][image_path]]
-
 
 *bold text*
 
@@ -292,18 +296,6 @@ A quote block
 
 [[table_1][Link to table 1]]
 [[foo_bar_section][Link to section via id property]]
-
-
-
-  
-
-
-
-   
-   
-
-
-
-
-
-   
+#+NAME: image_links
+1. [[file:./dolphin.jpg][alt_text]]
+2. [[dolphin.jpg][alt_text_2]]

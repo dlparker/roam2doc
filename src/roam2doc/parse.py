@@ -1,6 +1,7 @@
 import re
 import logging
 import typing
+from pathlib import Path
 from collections import defaultdict
 from enum import Enum
 from pprint import pformat
@@ -12,19 +13,19 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
                          ListItem, OrderedList, OrderedListItem, UnorderedList,
                          UnorderedListItem, DefinitionList, DefinitionListItem,
                          DefinitionListItemTitle, DefinitionListItemDescription,
-                         Table, TableRow, TableCell, Link, InternalLink)
+                         Table, TableRow, TableCell, Link, InternalLink, Image)
 
 class DocParser:
 
     def __init__(self, text, source, root=None):
         self.text = text
         self.lines = text.split('\n')
-        self.source = source
+        self.source = str(source)
         if root is None:
-            root = Root(source)
+            root = Root(self.source)
             self.branch = root.trunk
         else:
-            self.branch = Branch(root.trunk, source)
+            self.branch = Branch(root.trunk, self.source)
         self.root = root
         self.doc_properties = None
         self.doc_title = None
@@ -237,8 +238,8 @@ class ParseTool:
             return
         self.keywords = keywords
         for w in keywords:
-            name_key_start = "#+name:"
-            if w.lower().startswith(name_key_start):
+            name_key_start = "#+NAME:"
+            if w.upper().startswith(name_key_start):
                 endpart = w[len(name_key_start):].strip()
                 if endpart != '':
                     self.keyword_name = endpart
@@ -611,6 +612,8 @@ class ListParse(ParseTool):
                 parent_rec['children'].append(rec)
 
         the_list = self.do_one_level(self.parent_tree_node, top_level_records)
+        if self.keyword_name:
+            self.doc_parser.root.add_link_target(the_list, self.keyword_name)
         if ends_on_blanks:
             BlankLine(the_list)
             BlankLine(the_list)
@@ -878,23 +881,10 @@ class TargetObjectMatcher(ObjectRegexMatch):
         super().__init__(self.patterns)
         
 class InternalLinkObjectMatcher(ObjectRegexMatch):
-    patterns = [re.compile(r'\[\[(?P<pathreg>.+?)?\]\[(?P<description>.+?)?\]\]'),]
+    patterns = [re.compile(r'\[\[(?P<pathreg>.+?)?\](?:\[(?P<description>.+?)\])?\]'),]
     
     def __init__(self):
         super().__init__(self.patterns)
-
-"""
-I can't figure out how to deal with image references. They look just like
-links to regexp, unless you use the format [[file:./foo.jpg][altvalue]]
-and that doesn't work very well if you are converting to html, so I am just
-not going to support them unless I can figure out some clever way to
-tell the difference.
-class ImageObjectMatcher(ObjectRegexMatch):
-    patterns = [re.compile(r'\[\[file:(?P<image>.+?)\](?:\[(?P<alt>.+?)\])?\]'),]
-    
-    def __init__(self):
-        super().__init__(self.patterns)
-"""
 
 class MatchHeading(LineRegexMatch):
     patterns = [re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?'),]
@@ -1197,6 +1187,8 @@ class ToolBox:
         matches_per_type = {}
         for match_type, matcher in self.object_matchers.items():
             mres = matcher.match_text(line)
+            for m in mres:
+                m['source_line'] = line
             matches_per_type[match_type] = mres
 
         for match_type in self.object_matchers:
@@ -1254,16 +1246,14 @@ class ToolBox:
     def do_object_parts(self, item, tree_node):
         simple_text = None
         if "inner_objects" not in item:
-            #rejects = [MatcherType.internal_link_object,  MatcherType.image_object]
             rejects = [MatcherType.internal_link_object,]
             if item['matcher_type'] not in rejects :
                 simple_text = item['matched'].groupdict()['text']
         tree_item = self.add_object_item(tree_node, item, simple_text)
         if "inner_objects" not in item:
             return tree_item
-        if "inner_objects" in item:
-            for in_item in item['inner_objects']:
-                self.do_object_parts(in_item, tree_item)
+        for in_item in item['inner_objects']:
+            self.do_object_parts(in_item, tree_item)
         return tree_item
         
     def add_object_item(self, tree_node, item, simple_text=None):
@@ -1284,8 +1274,37 @@ class ToolBox:
         elif item['matcher_type'] == MatcherType.internal_link_object:
             target_text = item['matched'].groupdict()['pathreg']
             desc = item['matched'].groupdict()['description']
-            tree_item = InternalLink(tree_node, target_text, None)
-            items = self.get_text_and_object_nodes_in_line(tree_item, desc)
+            if desc is None:
+                desc = target_text
+            # have to figure out what kind of link it is
+            if "//" in target_text:
+                # some kind of uri
+                tree_item = Link(tree_node, target_text, None)
+                items = self.get_text_and_object_nodes_in_line(tree_item, desc)
+            else:
+                # Try to make a file path from it and
+                # see if there is a file there, which means
+                # that it is an image file. If it is not
+                # an image file then the user is out of luck
+                tree_item = None
+                prefix = 'file:'
+                if target_text.lower().startswith(prefix):
+                    file_part = target_text[len(prefix):]
+                else:
+                    file_part = target_text
+                doc_path = Path(self.doc_parser.root.source).parent
+                if file_part.startswith('./'):
+                    path = Path(doc_path, file_part[2:])
+                else:
+                    path = Path(doc_path, file_part)
+                path.resolve()
+                if path.exists():
+                    tree_item = Image(tree_node, str(path), desc)
+                else:
+                    # If we can't make it into an image, just assume
+                    # it is an internal link
+                    tree_item = InternalLink(tree_node, target_text, None)
+                    items = self.get_text_and_object_nodes_in_line(tree_item, desc)
         #elif item['matcher_type'] == MatcherType.image_object:
             #src_text = item['matched'].groupdict()['image']
             #alt_text = item['matched'].groupdict()['alt']

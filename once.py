@@ -184,7 +184,7 @@ def t5():
     target = Path(fdir, "all_nodes.org")
     with open(target) as f:
         buff = f.read()
-    doc_parser = DocParser(buff, "inline")
+    doc_parser = DocParser(buff, target)
     doc_parser.parse()
     print(doc_parser.root.to_html())
     

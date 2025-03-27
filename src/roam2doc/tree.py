@@ -709,7 +709,21 @@ class Link(Container):
         self.display_text = display_text
 
     def to_html(self, indent_level):
-        raise NotImplementedError
+        lines = []
+        indent_level += 1
+        padding, line1 = setup_tag_open("a", indent_level, self)
+        line1 += f' href="{self.target_text}">'
+        if self.display_text:
+            line1 += f'{self.display_text}'
+        elif len(self.children) > 0:
+            for child in self.children:
+                for sub in child.to_html(0):
+                    line1 += sub
+        else:
+            line1 += f'{self.target_text}'
+        line1 += '</a>'
+        lines.append(line1)
+        return lines
 
     def to_json_dict(self):
         ## fiddle the resluts around to make it easier to understand
@@ -768,6 +782,7 @@ links to regexp, unless you use the format [[file:./foo.jpg][altvalue]]
 and that doesn't work very well if you are converting to html, so I am just
 not going to support them unless I can figure out some clever way to
 tell the difference.
+"""
 class Image(Node):
     
     def __init__(self, parent, src_text, alt_text=None):
@@ -794,7 +809,6 @@ class Image(Node):
         res = dict(cls=superres['cls'], props=lres)
         return res
 
-"""
 
 def setup_tag_open(tag, indent_level, obj):
     root = obj.find_root()

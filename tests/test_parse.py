@@ -18,13 +18,13 @@ start_frag_files = ["file_start_with_heading.org",
                     "file_start_with_only_title.org",
                     "file_start_with_props_and_title.org",]
 
-def get_example_file_contents(name):
+def get_example_file_path_and_contents(name):
     this_dir = Path(__file__).resolve().parent
     fdir = Path(this_dir, "org_files", "examples")
     target = Path(fdir, name)
     with open(target) as f:
         buffer = f.read()
-    return buffer
+    return target, buffer
     
 def get_frag_file_contents(name):
     this_dir = Path(__file__).resolve().parent
@@ -39,7 +39,7 @@ def test_parser_stack():
     start_contents = get_frag_file_contents(start_file)
     para1 = get_frag_file_contents("no_object_paragraph.org")
     contents = start_contents + para1
-    doc_parser =  DocParser(contents, "combined1")
+    doc_parser =  DocParser(contents, start_file)
 
     section_p = None
 
@@ -239,8 +239,9 @@ def test_file_starts_with_second_section():
         
 def test_file_all_nodes():
     name = "all_nodes.org"
-    contents = get_example_file_contents(name)
-    doc_parser =  DocParser(contents, name)
+    path, contents = get_example_file_path_and_contents(name)
+    # need the path to make image tag work
+    doc_parser =  DocParser(contents, path)
     section_p = None
     def parse_start(parser):
         nonlocal section_p
@@ -251,12 +252,12 @@ def test_file_all_nodes():
     def parse_end(parser):
         pass
 
-
     doc_parser.set_parse_callbacks(parse_start, parse_end)
     res = doc_parser.parse()
     # make sure output is produced without blowing up
     doc_parser.root.to_html()
     doc_parser.root.to_html(make_pretty=False, include_json=True)
+
 
 
 def gen_top_lists():
