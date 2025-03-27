@@ -402,8 +402,16 @@ class TextTag(Container):
         lines = []
         indent_level += 1
         padding, line1 = setup_tag_open(f"{self.tag}", indent_level, self)
-        line1 += f">{self.simple_text}</{self.tag}>"
-        lines.append(line1)
+        if self.simple_text:
+            line1 += f">{self.simple_text}</{self.tag}>"
+            lines.append(line1)
+        else:
+            line1 += ">"
+            lines.append(line1)
+            for node in self.children:
+                lines.extend(node.to_html(indent_level))
+            lines.append(padding + f'</{self.tag}>')
+            
         return lines
     
 class BoldText(TextTag):
@@ -536,7 +544,6 @@ class ListItem(Container):
     
 class OrderedList(List):
 
-        
     def to_html(self, indent_level):
         lines = []
         indent_level += 1

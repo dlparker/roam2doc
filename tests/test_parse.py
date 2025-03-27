@@ -10,7 +10,7 @@ from roam2doc.parse import (DocParser, MatchHeading, MatchTable, MatchList,
 from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
 from setup_logging import setup_logging
 
-setup_logging(default_level="warning")
+setup_logging(default_level="debug")
 
 start_frag_files = ["file_start_with_heading.org",
                     "file_start_with_no_heading.org",
@@ -478,3 +478,14 @@ def gen_big_mix():
     buff = '\n'.join(lines)
     return buff
     
+def test_1():
+    lines = []
+    lines.append('[[target][*/bold iti/*]]')
+    lines.append('')
+    lines.append('<<target>>')
+    
+    buff = '\n'.join(lines)
+
+    doc_parser = DocParser(buff, "inline")
+    doc_parser.parse()
+    print(doc_parser.root.to_html())

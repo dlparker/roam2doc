@@ -368,7 +368,7 @@ class GreaterElementParse(ParseTool):
         pos = self.start
         end = self.end
         self.short_id = fr"GenELem\@{pos}"
-        self.logger.info(self.match_log_format, self.short_id, "List", "parsing starting")
+        self.logger.info(self.match_log_format, self.short_id, "", "parsing starting")
         last_sub_start = pos - 1
         last_sub_end = pos - 1
         tool_box = ToolBox(self.doc_parser)
@@ -658,7 +658,6 @@ class ListParse(ParseTool):
             item = OrderedListItem(the_list, ordinal)
             self.parse_item_contents(item, record)
         elif list_type == ListType.unordered_list:
-            content_list = tool_box.get_text_and_object_nodes_in_line(the_list, record['contents'])
             item = UnorderedListItem(the_list, None)
             self.parse_item_contents(item, record)
         elif list_type == ListType.def_list:
