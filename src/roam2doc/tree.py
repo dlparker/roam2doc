@@ -32,7 +32,7 @@ class Root:
         # breadth first
         for kid in level.children:
             if isinstance(kid, Section):
-                if kid.heading.text == text:
+                if kid.heading.original_text == text:
                     return kid.heading
         for kid in level.children:
             if not hasattr(kid, 'children'):
@@ -139,12 +139,12 @@ class Branch:
     
 class Node:
     
-    def __init__(self, parent, auto_add=True):
+    def __init__(self, parent):
         self.parent = parent
         self.root = self.find_root()
         self.node_id = self.root.new_node_id()
         self.link_targets = []
-        if auto_add and self.parent != self.root:
+        if self.parent != self.root:
             self.parent.add_node(self)
 
     def find_root(self):
@@ -242,17 +242,16 @@ class Section(Container):
     """ This type of Container starts with a heading, or at the beginning of the file.
     It may have a set of properties from a "drawer". 
     """
-    def __init__(self, parent, heading_text):
+    def __init__(self, parent):
         super().__init__(parent)
-        par = self.parent
-        wraps = 0
-        while not isinstance(par, Branch):
-            if isinstance(par, Section):
-                wraps += 1
-            par = par.parent
-        level = wraps + 1
-        self.heading = Heading(parent=self, text=heading_text, level=level)
-
+        self.heading = None
+        
+    def add_node(self, node):
+        if isinstance(node, Heading):
+            self.heading = node
+            return
+        super().add_node(node)
+            
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -314,22 +313,31 @@ class Text(Node):
         res['props']['text'] = self.text
         return res
         
-class Heading(Node):
+class Heading(Container):
     """ An org heading, meaning it starts with one or more asterisks. Always starts a new
     Section, but not all Sections start with a heading. May have a parent, may not.
     """
-    def __init__(self, parent, text, level=1,):
-        super().__init__(parent, auto_add=False)
-        self.text = text
+    def __init__(self, parent, level, original_text):
+        super().__init__(parent)
         self.level = level
+        # this allows heading to be a link target by text match
+        self.original_text = original_text
+        self.text = None
         self.properties = {}
 
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
         padding, line1 = setup_tag_open(f"h{self.level}", indent_level, self)
-        line1 += f">{self.text}</h{self.level}>"
-        return [line1,]
+        lines.append(line1)
+        if self.text:
+            line1 += f">{self.text}</h{self.level}>"
+            return lines
+        line1 += ">"
+        for child in self.children:
+            lines.extend(child.to_html(indent_level))
+        lines.append(padding + f"</h{self.level}>")
+        return lines
         
     def to_json_dict(self):
         res = super().to_json_dict()

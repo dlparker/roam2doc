@@ -8,7 +8,12 @@
 :PROPERTIES:
 :ID: 00000000-0000-0000-0000-000000000002
 :END:
-* Section 1 heading
+* Section 1 heading and it has */some/* ~objects~
+** Section 1 subsection 1 heading and it also has */some/* ~objects~
+*** level 3 section
+**** level 4 section
+***** level 5 section
+****** level 6 section
 
 1. some *bold* text
 2. some /italic/ text 
@@ -223,7 +228,7 @@ quoted text with cite
             + def2 :: other thing
 
 
-    lines = []
+
 * a section 2
 - unordered list starts
   - unordered sub 1

@@ -7,12 +7,8 @@
 7. [ ] Document object parsing limitations, just name what is parsed and where
    1. Bold text not allowed in headings, heading will be converted to regular/bold text
    2. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
-8. [ ] Write tests for regex tools
-9. [ ] Get margin for everthing and figure out how to apply css to duplicate it. Best effort, not everything.
-10. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback
-11. [ ] Create io.py to manage input and output
-12. [ ] Consider making all parsers have a prop that reports the tree type it creates. ListParser could have subclasses
-13. [ ] Need to fix list indent calculation to properly handle tabs. Prolly make tab a level, regarless of spaces_to_level ratio
-14. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
-15. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
+8. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback
+9. [ ] Create io.py to manage input and output
+10. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
+11. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
    

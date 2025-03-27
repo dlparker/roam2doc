@@ -480,6 +480,10 @@ def gen_big_mix():
     
 def test_1():
     lines = []
+    lines.append('* A heading with *bold*!')
+    lines.append('** A sub heading with */bold italiacs/* !')
+    lines.append('')
+    lines.append('* Section 2* !')
     lines.append('[[target][*/bold iti/*]]')
     lines.append('')
     lines.append('<<target>>')

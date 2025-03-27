@@ -121,7 +121,7 @@ class DocParser:
         section = self.find_first_section(start_offset)
         return section
 
-    def find_top_sections(self):
+    def find_sections(self):
         """ This method is broken out from the parse method to make it easier to build
         child classes for test, so that the test version can poke at the steps of the process """
         first_section = self.parse_file_start()
@@ -145,8 +145,6 @@ class DocParser:
                 continue
             stars =  elem['matched_contents']['stars']
             level = len(stars)
-            if level > 1:
-                continue
             starts.append(elem['match_line'])
         index = 0
         for start in starts:
@@ -164,7 +162,7 @@ class DocParser:
             self.sections.append(section)
             
     def parse(self):
-        self.find_top_sections()
+        self.find_sections()
         index = 0
         for section in self.sections:
             self.current_section = section
@@ -270,10 +268,12 @@ class SectionParse(ParseTool):
 
     def calc_level(self):
         first_line = self.doc_parser.lines[self.start].lstrip()
-        if first_line.startswith('*'):
-            last_star = first_line.lstrip().rfind('*')
-            self.level = last_star + 1
-            self.heading_text = first_line[last_star + 1:].strip()
+        tool_box = ToolBox(self.doc_parser)
+        matcher = tool_box.get_matcher(MatcherType.heading)
+        heading_match = matcher.match_line(first_line)
+        if heading_match:
+            self.level = len(heading_match['groupdict']['stars'])
+            self.heading_text = heading_match['groupdict']['heading']
             return True
         # We don't have an actual heading, just start of file.
         # We need to figure out some kind of text for a heading, cause
@@ -294,7 +294,10 @@ class SectionParse(ParseTool):
         pos = self.start
         if found_heading:
             pos += 1
-        self.tree_node = Section(self.parent_tree_node, self.heading_text)
+        self.tree_node = Section(self.parent_tree_node)
+        heading = Heading(self.tree_node, self.level, self.heading_text)
+        tool_box = ToolBox(self.doc_parser)
+        objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text)
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
             return self.end
@@ -305,7 +308,6 @@ class SectionParse(ParseTool):
             pos += len(self.properties) + 2
             if "ID" in self.properties:
                 self.doc_parser.root.add_link_target(self.tree_node, self.properties['ID'])
-        tool_box = ToolBox(self.doc_parser)
         # now find all greater elements
         last_sub_start = pos - 1
         last_sub_end = pos - 1
@@ -824,7 +826,7 @@ class ObjectRegexMatch:
     def match_text(self, text, first_only=False):
         matches = []
         for re in self.patterns:
-            for m in re.finditer(text): 
+            for m in re.finditer(text):
                 matched = dict(start=m.start(),
                                end=m.end(),
                                groupdict=m.groupdict(),
@@ -891,16 +893,6 @@ class MatchHeading(LineRegexMatch):
     def __init__(self):
         super().__init__(self.patterns)
 
-    def match_line(self, line):
-        res = super().match_line(line)
-        if res:
-            tmp = line.lstrip('*')
-            rest = line.lstrip()[len(line) - len(tmp):]
-            if '*' in rest:
-                # treat it as a regular line containing bold text
-                return None
-        return res
-            
     def get_parse_tool(self):
         return SectionParse
 
@@ -1152,7 +1144,7 @@ class ToolBox:
                                string=matched.string,
                                match_line=pos,
                                start_char=match_res['start'],
-                               end_char=match_res['end'],
+                               end_char=match_res['end'] - 1,
                                keywords=pending_keywords,
                                matched_contents=matched.groupdict())
                     if hasattr(matcher, 'match_end_line') and callable(getattr(matcher, 'match_end_line')):
@@ -1165,7 +1157,7 @@ class ToolBox:
                                               parse_tool=parse_tool,
                                               match_line=subpos,
                                               start_char=end_matched['start'],
-                                              end_char=end_matched['end'],
+                                              end_char=end_matched['end'] - 1,
                                               end_matched_contents=end_matched['groupdict'])
                                 res['end_match'] = ressub
                                 break
@@ -1225,8 +1217,10 @@ class ToolBox:
                     items.append(Text(tree_node, text_chunk))
             items.append(self.do_object_parts(item, tree_node))
             last_end = item['end']
-        if last_end + 1 < len(line):
-            text_chunk = line[last_end + 1:].strip()
+
+        # end is actually after the last matching character
+        if last_end  < len(line):
+            text_chunk = line[last_end:].strip()
             if text_chunk:
                 Text(tree_node, text_chunk)
         return items
