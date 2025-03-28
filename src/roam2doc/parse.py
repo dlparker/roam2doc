@@ -496,7 +496,8 @@ class CommentParse(LesserElementParse):
         super().__init__(*args, **kwargs)
         self.text_inside = False
         self.tree_class = CommentBlock
-    
+
+        
 class ExportParse(LesserElementParse):
 
     def __init__(self, *args, **kwargs):
@@ -1039,7 +1040,7 @@ class MatchComment(LineRegexAndEndMatch):
         super().__init__(self.patterns, self.end_pattern)
 
     def get_parse_tool(self):
-        return ExportParse
+        return CommentParse
     
 class MatchExport(LineRegexAndEndMatch):
     patterns = [re.compile(r'^\#\+BEGIN_EXPORT', re.IGNORECASE),]

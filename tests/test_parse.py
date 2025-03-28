@@ -268,9 +268,32 @@ def test_file_all_nodes():
     doc_parser.root.to_html(make_pretty=False, include_json=True)
 
 def test_cli():
+    this_dir = Path(__file__).resolve().parent
+    org_file = Path(this_dir, 'org_files', 'examples', 'objects.org')
+
     with patch('sys.stdout', new=StringIO()) as fake_out:
-        this_dir = Path(__file__).resolve().parent
-        org_file = Path(this_dir, 'org_files', 'examples', 'objects.org')
+        with patch('sys.argv', ['tester', "--doc_type", "json", str(org_file)]):
+            parsers = main()
+            outvalue = fake_out.getvalue()
+    reload_data = json.loads(outvalue)
+    jdata = parsers[0].root.to_json_dict()
+
+    # just check some of the structure to do a sanity check on reloading from file
+    assert jdata['cls'] == reload_data['cls']
+    o_sec_1 = jdata['props']['trunk']['props']['nodes'][0]
+    r_sec_1 = jdata['props']['trunk']['props']['nodes'][0]
+    assert o_sec_1['cls'] == "<class 'roam2doc.tree.Section'>"
+    assert r_sec_1['cls'] == "<class 'roam2doc.tree.Section'>"
+
+    # blank line, should be literally the same
+    assert o_sec_1['props']['children'][0] == r_sec_1['props']['children'][0]
+    o_head_1 = o_sec_1['props']['heading']
+    r_head_1 = r_sec_1['props']['heading']
+    assert o_head_1['cls'] == "<class 'roam2doc.tree.Heading'>"
+    assert r_head_1['cls'] == "<class 'roam2doc.tree.Heading'>"
+    assert o_head_1['props']['node_id'] == r_head_1['props']['node_id']
+            
+    with patch('sys.stdout', new=StringIO()) as fake_out:
         with patch('sys.argv', ['tester', str(org_file)]):
             parsers = main()
             assert "bold_text</b>" in fake_out.getvalue()
@@ -281,20 +304,42 @@ def test_cli():
         first_bold = para.children[1]
         assert first_bold.simple_text == "bold_text"
         assert(first_bold.get_source_data()['source']) == "*bold_text*"
-        with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo', '--overwrite']):
-            parsers = main()
+        
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
         b1 = parsers[0].branch
         sec = b1.children[0]
         blank = sec.children[0]
         para = sec.children[1]
         first_bold = para.children[1]
         assert first_bold.simple_text == "bold_text"
-        with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo']):
-            with pytest.raises(SystemExit):
+
+        
+    with patch('sys.argv', ['tester', "--doc_type", "json", str(org_file), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
+    with open('/tmp/foo', 'r', encoding='utf-8') as f:
+        outvalue = f.read()
+        
+            
+    reload_data = json.loads(outvalue)
+    jdata = parsers[0].root.to_json_dict()
+
+    # just check some of the structure to do a sanity check on reloading from file
+    assert jdata['cls'] == reload_data['cls']
+    o_sec_1 = jdata['props']['trunk']['props']['nodes'][0]
+    r_sec_1 = jdata['props']['trunk']['props']['nodes'][0]
+    o_head_1 = o_sec_1['props']['heading']
+    r_head_1 = r_sec_1['props']['heading']
+    assert o_head_1['cls'] == "<class 'roam2doc.tree.Heading'>"
+    assert r_head_1['cls'] == "<class 'roam2doc.tree.Heading'>"
+    assert o_head_1['props']['node_id'] == r_head_1['props']['node_id']
+    
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo']):
+        with pytest.raises(SystemExit):
                 parsers = main()
-        with patch('sys.argv', ['tester', str(org_file), '--output', '/directory_that_does_not_exist/foo']):
-            with pytest.raises(SystemExit):
-                parsers = main()
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/directory_that_does_not_exist/foo']):
+        with pytest.raises(SystemExit):
+            parsers = main()
         
         
 def test_roam_combine_1():

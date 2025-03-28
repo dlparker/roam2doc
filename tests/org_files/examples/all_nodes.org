@@ -264,7 +264,7 @@ A center block
     | ww | Checking inside center block *this item is bold* |
     | zz | /this item is italian/ |
 #+END_CENTER
-#+BEGIN_EXApMPLE python
+#+BEGIN_EXAMPLE python
  This is an example
     lines.append(" of what don't know")
 #+END_EXAMPLE

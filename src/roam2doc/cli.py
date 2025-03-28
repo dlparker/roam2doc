@@ -1,4 +1,5 @@
 import sys
+import json
 import argparse
 from pathlib import Path
 import logging
@@ -25,6 +26,12 @@ def setup_parser():
         help="Output file path for HTML (default: print to stdout)"
     )
     parser.add_argument(
+        "-t", "--doc_type",
+        choices=['html', 'json'],
+        default='html',
+        help="Output file path for HTML (default: print to stdout)"
+    )
+    parser.add_argument(
         "-l", "--logging",
         choices=['error', 'warning', 'info', 'debug'],
         default='error',
@@ -37,7 +44,7 @@ def setup_parser():
     )
     return parser
 
-def process_input(input_path, output_path=None, allow_overwrite=False, logging_level=None):
+def process_input(input_path, logging_level, doc_type, output_path=None, allow_overwrite=False):
     """Process the input and generate HTML output."""
 
     # ensure output request (if any) makes sense before parsing
@@ -67,13 +74,19 @@ def process_input(input_path, output_path=None, allow_overwrite=False, logging_l
     root = parsers[0].root
 
     # Handle output
-    html_output = root.to_html()
+    if doc_type == "html":
+        output_text = root.to_html()
+    elif doc_type == "json":
+        output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
         with open(output_path, 'w', encoding="utf-8") as f:
-            f.write(html_output)
-        logger.info(f"HTML written to {output_path}")
+            f.write(output_text)
+        if doc_type == "html":
+            logger.info(f"HTML written to {output_path}")
+        elif doc_type == "json":
+            logger.info(f"JSON written to {output_path}")
     else:
-        print(html_output)
+        print(output_text)
 
     return parsers
     
@@ -87,7 +100,7 @@ def main():
 
     # Process the input and output
     try:
-        parsers = process_input(args.input, args.output, args.overwrite, args.logging)
+        parsers = process_input(args.input, args.logging, args.doc_type, args.output, args.overwrite)
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         raise SystemExit(1)
