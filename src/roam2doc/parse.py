@@ -6,14 +6,14 @@ from collections import defaultdict
 from enum import Enum
 from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
-                         LinkTarget, BoldText, ItalicText,
-                         UnderlinedText, LinethroughText, InlineCodeText,
-                         VerbatimText, CenterBlock, QuoteBlock, CodeBlock,
-                         ExampleBlock, CommentBlock, ExportBlock, List,
-                         ListItem, OrderedList, OrderedListItem, UnorderedList,
-                         UnorderedListItem, DefinitionList, DefinitionListItem,
-                         DefinitionListItemTitle, DefinitionListItemDescription,
-                         Table, TableRow, TableCell, Link, InternalLink, Image)
+                           LinkTarget, BoldText, ItalicText,
+                           UnderlinedText, LinethroughText, InlineCodeText,
+                           VerbatimText, CenterBlock, QuoteBlock, CodeBlock,
+                           ExampleBlock, CommentBlock, ExportBlock, List,
+                           ListItem, OrderedList, OrderedListItem, UnorderedList,
+                           UnorderedListItem, DefinitionList, DefinitionListItem,
+                           DefinitionListItemTitle, DefinitionListItemDescription,
+                           Table, TableRow, TableCell, Link, InternalLink, Image)
 
 class DocParser:
 
@@ -23,9 +23,10 @@ class DocParser:
         self.source = str(source)
         if root is None:
             root = Root(self.source)
-            self.branch = root.trunk
+            self.branch = Branch(root, self.source, self)
+            root.trunk = self.branch
         else:
-            self.branch = Branch(root, self.source, root.trunk)
+            self.branch = Branch(root, self.source, self, root.trunk)
             root.trunk.add_node(self.branch)
         self.root = root
         self.doc_properties = None
@@ -38,7 +39,7 @@ class DocParser:
         self.parse_problems = []
         self.parse_start_callback = None
         self.parse_end_callback = None
-        self.logger = logging.getLogger('roam2doc-parser')
+        self.logger = logging.getLogger('roam2doc.parser')
 
     def set_parse_callbacks(self, start_cb, end_cb):
         # For support of whitebox testing, this will
@@ -181,8 +182,8 @@ class DocParser:
                         self.root.add_link_target(section.tree_node, raw.lstrip())
             self.pop_parser(section)
             index += 1
+        self.branch.note_parse_done()
         return self.branch
-
 
     def parse_properties(self, start, end):
         # :PROPERTIES:
@@ -226,7 +227,7 @@ class ParseTool:
         self.parent_tree_node = parent_tree_node
         self.keywords = None
         self.keyword_name = None
-        self.logger = logging.getLogger('roam2doc-parser')
+        self.logger = logging.getLogger('roam2doc.parser')
         # these are only used to support whitebox testing techniques
         self.start_callback = None
         self.end_callback = None
@@ -300,10 +301,10 @@ class SectionParse(ParseTool):
         pos = self.start
         if found_heading:
             pos += 1
-        self.tree_node = Section(self.parent_tree_node)
-        heading = Heading(self.tree_node, self.level, self.heading_text)
+        self.tree_node = Section(self.parent_tree_node, self.start, self.end)
+        heading = Heading(self.tree_node, self.level, self.start, self.start, self.heading_text)
         tool_box = ToolBox(self.doc_parser)
-        objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text)
+        objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text, pos)
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
             return self.end
@@ -339,7 +340,7 @@ class TableParse(ParseTool):
     def parse(self):
         if self.start_callback:
             self.start_callback(self)
-        self.tree_node = table = Table(self.parent_tree_node)
+        self.tree_node = table = Table(self.parent_tree_node, self.start, self.end)
         if self.keyword_name:
             self.doc_parser.root.add_link_target(table, self.keyword_name)
         tool_box = ToolBox(self.doc_parser)
@@ -354,10 +355,11 @@ class TableParse(ParseTool):
                 if next_elem['match_type'] != MatcherType.table:
                     return pos - 1
                 self.logger.debug(self.match_log_format, short_id, str(matcher), line)
-                tr = TableRow(table)
+                tr = TableRow(table, pos, pos)
                 for item in line.split('|')[1:-1]:
-                    cell = TableCell(tr)
-                    content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node, item)
+                    cell = TableCell(tr, pos, pos)
+                    content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node,
+                                                                              item, pos)
                     for citem in content_list:
                         citem.move_to_parent(cell)
                 pos += 1
@@ -435,7 +437,7 @@ class WrappedGEParse(GreaterElementParse):
         self.start = elem_start
         self.end = elem_end
         parent_node = self.parent_tree_node
-        self.parent_tree_node = self.tree_class(parent_node)
+        self.parent_tree_node = self.tree_class(parent_node, elem_start, elem_end)
         res = super().parse()
         self.parent_tree_node = parent_node 
         self.start = wrap_start
@@ -469,7 +471,7 @@ class LesserElementParse(ParseTool):
         start = self.start + 1
         end = self.end -1
         buff = '\n'.join(self.doc_parser.lines[start:end + 1])
-        tree_node = self.tree_class(self.parent_tree_node, buff)
+        tree_node = self.tree_class(self.parent_tree_node, start, end, buff)
         if self.end_callback:
             self.end_callback(self)
         return self.end
@@ -566,6 +568,7 @@ class ListParse(ParseTool):
             if match_res:
                 self.logger.info(self.match_log_format, self.short_id, "List", line)
                 match_res['extra_lines'] = []
+                match_res['line_index'] = pos
                 match_records[pos] = match_res
                 if pos == self.start:
                     match_res['prev_input_line'] = -1
@@ -623,8 +626,8 @@ class ListParse(ParseTool):
         if self.keyword_name:
             self.doc_parser.root.add_link_target(the_list, self.keyword_name)
         if ends_on_blanks:
-            BlankLine(the_list)
-            BlankLine(the_list)
+            BlankLine(the_list, self.list_end-1, self.list_end-1)
+            BlankLine(the_list, self.list_end, self.list_end)
         if self.end_callback:
             self.end_callback(self)
         return self.list_end
@@ -632,14 +635,16 @@ class ListParse(ParseTool):
     def do_one_level(self, parent_tree_node, level_records):
         first_rec = level_records[0]
         cur_list = self.to_tree_list(parent_tree_node, first_rec)
-        self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, first_rec['level'], cur_list,
-                                  first_rec['contents'])
+        self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id,
+                          first_rec['level'], cur_list,
+                          first_rec['contents'])
         first_rec['tree_list'] = cur_list
         
         for record in level_records:
             tree_node = self.to_tree_node(cur_list, record)
             record['tree_node'] = tree_node
-            self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id, record['level'], tree_node,
+            self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id,
+                              record['level'], tree_node,
                               record['contents'])
             # for any children, recurse
             if "children" in record and len(record['children']) > 0:
@@ -649,36 +654,41 @@ class ListParse(ParseTool):
     def to_tree_list(self, parent_tree_item, record):
         list_type = record['list_type']
         margin = record['lindent']
+        line = record['line_index']
+        # gonna use this for both start and end, and fix end later
         if list_type == ListType.ordered_list:
-            the_list = OrderedList(parent=parent_tree_item, margin=margin)
+            the_list = OrderedList(parent_tree_item, line, line, margin=margin)
         elif list_type == ListType.unordered_list:
-            the_list = UnorderedList(parent=parent_tree_item, margin=margin)
+            the_list = UnorderedList(parent_tree_item, line, line, margin=margin)
         elif list_type == ListType.def_list:
-            the_list = DefinitionList(parent=parent_tree_item, margin=margin)
+            the_list = DefinitionList(parent_tree_item, line, line, margin=margin)
         return the_list
     
     def to_tree_node(self, the_list, record):
-        self.logger.debug('Called to_tree_node with %s, from record %s', str(the_list), record['contents'])
+        self.logger.debug('Called to_tree_node with %s, from record %s', str(the_list),
+                          record['contents'])
         list_type = record['list_type']
+        line = record['line_index']
         tool_box = ToolBox(self.doc_parser)
         if list_type == ListType.ordered_list:
             ordinal = record['bullet'].rstrip(".").rstrip(')')
-            item = OrderedListItem(the_list, ordinal)
+            item = OrderedListItem(the_list, line, line, ordinal)
             self.parse_item_contents(item, record)
         elif list_type == ListType.unordered_list:
-            item = UnorderedListItem(the_list, None)
+            item = UnorderedListItem(the_list, line, line, None)
             self.parse_item_contents(item, record)
         elif list_type == ListType.def_list:
-            title = DefinitionListItemTitle(the_list, record['tag'])
-            desc = DefinitionListItemDescription(the_list)
+            title = DefinitionListItemTitle(the_list, line, line, record['tag'])
+            desc = DefinitionListItemDescription(the_list, line, line)
             self.parse_item_contents(desc, record)
-            item = DefinitionListItem(the_list, title, desc)
+            item = DefinitionListItem(the_list, line, line, title, desc)
         return item
 
     def parse_item_contents(self, item, record):
         tool_box = ToolBox(self.doc_parser)
         # this will become bigger once I add parsing for other content such as elements
-        content_list = tool_box.get_text_and_object_nodes_in_line(item, record['contents'])
+        content_list = tool_box.get_text_and_object_nodes_in_line(item, record['contents'],
+                                                                  record['line_index'])
         if len(record['extra_lines']) > 0:
             xtra = record['extra_lines'] 
             start = xtra[0]
@@ -725,7 +735,7 @@ class ParagraphParse(ParseTool):
         super().__init__(doc_parser, start, end, parent_tree_node)
         self.start = start
         self.end = end
-        self.logger = logging.getLogger('roam2doc-parser')
+        self.logger = logging.getLogger('roam2doc.parser')
         
     def parse(self):
         if self.start_callback:
@@ -738,15 +748,13 @@ class ParagraphParse(ParseTool):
         while pos < self.end + 1 and not any:
             for line in self.doc_parser.lines[pos:end + 1]:
                 if line.strip() == "":
-                    BlankLine(self.parent_tree_node)
+                    BlankLine(self.parent_tree_node, pos, pos)
                     pos += 1
                 else:
                     any = True
                     break
         if pos > self.end:
             return
-        self.tree_node = para = Paragraph(self.parent_tree_node)
-        self.logger.debug('Adding paragraph to parser %s', self)
         # find all the paragraphs first
         ranges = []
         start_pos =  pos
@@ -767,12 +775,11 @@ class ParagraphParse(ParseTool):
             ranges.append([start_pos, self.end])
         elif prev_end < self.end + 1:
             ranges.append([prev_end, self.end])
-
         tool_box = ToolBox(self.doc_parser)
         index = 0
+        self.logger.debug('Adding paragraph to parser %s', self)
         for r_spec in ranges:
-            if index > 0:
-                para = Paragraph(self.parent_tree_node)
+            para = Paragraph(self.parent_tree_node, r_spec[0], r_spec[1])
             index += 1
             line_index = r_spec[0]
             for line in self.doc_parser.lines[r_spec[0]:r_spec[1] + 1]:
@@ -790,9 +797,9 @@ class ParagraphParse(ParseTool):
                     pass
                 elif line_index < r_spec[1] and line.strip() == '':
                     # must be more than one blank after paragraph, we honor that
-                    BlankLine(para)
+                    BlankLine(para, line_index, line_index)
                 else:
-                    items = tool_box.get_text_and_object_nodes_in_line(para, line)
+                    items = tool_box.get_text_and_object_nodes_in_line(para, line, line_index)
                 line_index += 1
         if self.end_callback:
             self.end_callback(self)
@@ -1135,7 +1142,7 @@ class ToolBox:
         element_matchers = dict(self.greater_matchers)
         element_matchers.update(self.lesser_matchers)
         pos = start
-        logger = logging.getLogger('roam2doc-parser')
+        logger = logging.getLogger('roam2doc.parser')
         pending_keywords = []
         for line in self.doc_parser.lines[start:end+1]:
             # greater elements
@@ -1178,7 +1185,7 @@ class ToolBox:
             pos += 1
         return None
 
-    def get_text_and_object_nodes_in_line(self, tree_node, line):
+    def get_text_and_object_nodes_in_line(self, tree_node, line, line_index):
         blocks_by_offset = {}
 
         matches_per_type = {}
@@ -1186,6 +1193,7 @@ class ToolBox:
             mres = matcher.match_text(line)
             for m in mres:
                 m['source_line'] = line
+                m['line_index'] = line_index
             matches_per_type[match_type] = mres
 
         for match_type in self.object_matchers:
@@ -1197,7 +1205,7 @@ class ToolBox:
         items = []
         tmp = list(blocks_by_offset.keys())
         if len(tmp) == 0:
-            items.append(Text(tree_node, line))
+            items.append(Text(tree_node, line_index, line_index, line))
             return items
         tmp.sort()
         pos = tmp[0]
@@ -1220,15 +1228,15 @@ class ToolBox:
             if pos > last_end + 1:
                 text_chunk = line[last_end + 1:pos].strip()
                 if text_chunk:
-                    items.append(Text(tree_node, text_chunk))
-            items.append(self.do_object_parts(item, tree_node))
+                    items.append(Text(tree_node, line_index, line_index, text_chunk,
+                                      last_end + 1, pos))
+            items.append(self.do_object_parts(item, tree_node, line_index))
             last_end = item['end']
 
-        # end is actually after the last matching character
         if last_end  < len(line):
             text_chunk = line[last_end:].strip()
             if text_chunk:
-                Text(tree_node, text_chunk)
+                Text(tree_node, line_index, line_index, text_chunk, last_end, len(line))
         return items
 
     def fold_inner(self, pos, blocks_by_offset):
@@ -1242,34 +1250,37 @@ class ToolBox:
             self.fold_inner(next_pos, blocks_by_offset)
             block['inner_objects'] = inner
         
-    def do_object_parts(self, item, tree_node):
+    def do_object_parts(self, item, tree_node, line_index):
         simple_text = None
         if "inner_objects" not in item:
             rejects = [MatcherType.internal_link_object,]
             if item['matcher_type'] not in rejects :
                 simple_text = item['matched'].groupdict()['text']
-        tree_item = self.add_object_item(tree_node, item, simple_text)
+        tree_item = self.add_object_item(tree_node, item, line_index,
+                                         item['matched'].start(),
+                                         item['matched'].end() -1,
+                                         simple_text)
         if "inner_objects" not in item:
             return tree_item
         for in_item in item['inner_objects']:
-            self.do_object_parts(in_item, tree_item)
+            self.do_object_parts(in_item, tree_item, line_index)
         return tree_item
         
-    def add_object_item(self, tree_node, item, simple_text=None):
+    def add_object_item(self, tree_node, item, line_index, start_pos, end_pos, simple_text):
         if item['matcher_type'] == MatcherType.bold_object:
-            tree_item = BoldText(tree_node, simple_text)
+            tree_item = BoldText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.italic_object:
-            tree_item = ItalicText(tree_node, simple_text)
+            tree_item = ItalicText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.underlined_object:
-            tree_item = UnderlinedText(tree_node, simple_text)
+            tree_item = UnderlinedText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.linethrough_object:
-            tree_item = LinethroughText(tree_node, simple_text)
+            tree_item = LinethroughText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.inlinecode_object:
-            tree_item = InlineCodeText(tree_node, simple_text)
+            tree_item = InlineCodeText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.verbatim_object:
-            tree_item = VerbatimText(tree_node, simple_text)
+            tree_item = VerbatimText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.target_object:
-            tree_item = TargetText(tree_node, simple_text)
+            tree_item = TargetText(tree_node, line_index, start_pos, end_pos, simple_text)
         elif item['matcher_type'] == MatcherType.internal_link_object:
             target_text = item['matched'].groupdict()['pathreg']
             desc = item['matched'].groupdict()['description']
@@ -1278,8 +1289,8 @@ class ToolBox:
             # have to figure out what kind of link it is
             if "//" in target_text:
                 # some kind of uri
-                tree_item = Link(tree_node, target_text, None)
-                items = self.get_text_and_object_nodes_in_line(tree_item, desc)
+                tree_item = Link(tree_node, line_index, start_pos, end_pos, target_text, None)
+                items = self.get_text_and_object_nodes_in_line(tree_item, desc, line_index)
             else:
                 # Try to make a file path from it and
                 # see if there is a file there, which means
@@ -1298,15 +1309,12 @@ class ToolBox:
                     path = Path(doc_path, file_part)
                 path.resolve()
                 if path.exists():
-                    tree_item = Image(tree_node, str(path), desc)
+                    tree_item = Image(tree_node, line_index, line_index, str(path), desc)
                 else:
                     # If we can't make it into an image, just assume
                     # it is an internal link, give special treatment
-                    tree_item = InternalLink(tree_node, target_text, None)
-                    items = self.get_text_and_object_nodes_in_line(tree_item, desc)
-        #elif item['matcher_type'] == MatcherType.image_object:
-            #src_text = item['matched'].groupdict()['image']
-            #alt_text = item['matched'].groupdict()['alt']
-            #tree_item = Image(tree_node, src_text, alt_text)
+                    tree_item = InternalLink(tree_node, line_index, start_pos, end_pos,
+                                             target_text, None)
+                    items = self.get_text_and_object_nodes_in_line(tree_item, desc, line_index)
         return tree_item
         

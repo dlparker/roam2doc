@@ -55,7 +55,8 @@ def set_levels(handler_names, additions=None, default_level='error'): # pragma: 
         default_log =  info_log
     elif default_level == "debug":
         default_log =  debug_log
-    log_loggers['roam2doc-parser'] = default_log
+    log_loggers['roam2doc.parser'] = default_log
+    log_loggers['roam2doc.tree'] = default_log
     log_loggers['test_code'] = default_log
     if additions:
         for add in additions:

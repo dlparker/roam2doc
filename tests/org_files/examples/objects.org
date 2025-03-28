@@ -1,0 +1,10 @@
+* Section 1 heading
+
+Paragraph starts
+ *bold_text* *more_bold_text* *even more but with spaces*
+/italic_text/ /more_italic_text/ /spaced italic text/
+_underlined_text_ _more_underlined_text_ _underlined and spaces_
++linethrough_text+ +more_linethrough_text+ +spaces in line through+
+=verbatim_text= =more verbatim text=
+~code_text~ ~more code text~ ~code containing = sign ~
+ 

@@ -1,4 +1,5 @@
 import json
+import logging
 
 class Root:
     """ The base of the tree. The source designates the first source file or buffer parsed to
@@ -8,8 +9,7 @@ class Root:
     def __init__(self, source):
         self.source = source
         self.node_id = 0
-        # Always exactly one branch as trunk, others attach to it or each other
-        self.trunk = Branch(self, source)
+        self.trunk = None
         self.link_targets = {}
         self.css_classes = {}
 
@@ -101,14 +101,17 @@ class Branch:
     first file or buffer parsed to produce the tree. Normally this should be a pathlike object.
     """
 
-    def __init__(self, root, source, parent=None):
+    def __init__(self, root, source, parser, parent=None):
         self.root = root
-        self.node_id = root.new_node_id()
+        self.parser = parser
         self.source = source
         if parent is None:
             parent = root
         self.parent = parent # could be attatched to a trunk branch, not just the root
+        self.node_id = root.new_node_id()
         self.children = []
+        self.last_node_id = None
+        self.logger = logging.getLogger('roam2doc.tree')
 
     def find_root(self):
         return self.root
@@ -116,8 +119,22 @@ class Branch:
     def add_node(self, node):
         if node not in self.children:
             self.children.append(node)
+        
+    def note_parse_done(self):
+        max_id = self.node_id
+        if self.children:
+            max_id = self.level_max_node_id(self, max_id)
+        self.last_node_id = max_id
+        self.logger.info("%s node id range is %d to %d",  str(self), self.node_id, max_id)
 
-    def get_css_styles(self):
+    def level_max_node_id(self, node, max_id):
+        max_id = max(node.node_id, max_id)
+        if hasattr(node, "children"):
+            for child in node.children:
+                max_id = self.level_max_node_id(child, max_id)
+        return max_id
+    
+    def get_css_styles(self): 
         return []
     
     def to_json_dict(self):
@@ -143,10 +160,13 @@ class Branch:
     
 class Node:
     
-    def __init__(self, parent):
+    def __init__(self, parent, start_line, end_line):
         self.parent = parent
         self.root = self.find_root()
         self.node_id = self.root.new_node_id()
+        assert isinstance(start_line, int)
+        self.start_line = start_line
+        self.end_line = end_line
         self.link_targets = []
         if self.parent != self.root:
             self.parent.add_node(self)
@@ -158,6 +178,14 @@ class Node:
         if isinstance(parent, Root):
             return parent
         raise Exception("cannot find root!")
+    
+    def find_branch(self):
+        parent = self.parent
+        while parent is not None and not isinstance(parent, Branch):
+            parent = parent.parent
+        if isinstance(parent, Branch):
+            return parent
+        raise Exception("cannot find branch!")
     
     def add_link_target(self, target):
         self.link_targets.append(target)
@@ -175,10 +203,34 @@ class Node:
         
     def to_json_dict(self):
         # don't include back links, up the tree
-        res = dict(cls=str(self.__class__),
-                   props=dict(node_id=self.node_id,
-                   link_targets=[lt.to_json_dict() for lt in self.link_targets]))
+        props = dict(node_id=self.node_id,
+                     parent_object=self.parent.node_id,
+                     start_line=self.start_line, end_line=self.end_line,
+                     start_pos=getattr(self, 'start_pos', None),
+                     end_pos=getattr(self, 'end_pos', None),
+                     link_targets=[lt.to_json_dict() for lt in self.link_targets])
+        res = dict(cls=str(self.__class__), props=props)
         return res
+
+    def get_source_data(self):
+        data = dict(doc_source=self.find_root().source,
+                     start_line=self.start_line, end_line=self.end_line,
+                     start_pos=getattr(self, 'start_pos', None),
+                     end_pos=getattr(self, 'end_pos', None))
+
+        lines = self.find_branch().parser.lines
+        if self.start_line == self.end_line:
+            source = lines[self.start_line]
+            start_pos = getattr(self, 'start_pos', None)
+            end_pos = getattr(self, 'end_pos', None)
+            if start_pos is not None and end_pos is not None:
+                source = source[start_pos:end_pos+1]
+        else:
+            source = []
+            for line_index in range(self.start_line, self.end_line-1):
+                source.append(lines[line_index])
+        data['source'] = source
+        return data
         
     def __str__(self):
         msg = f"({self.node_id}) {self.__class__.__name__} "
@@ -189,15 +241,14 @@ class Node:
     def get_css_styles(self):
         return []
     
-    
 class BlankLine(Node):
     """ This node records the presence of a blank line in the original text. This
     allows format converters to preserve the original vertical separation of text if
     so desired. They often also mark the end of other elements, such as tables, lists,
     etc.
     """
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line):
+        super().__init__(parent, start_line, end_line)
     
     def to_html(self, indent_level):
         lines = []
@@ -209,8 +260,9 @@ class BlankLine(Node):
     
 class Container(Node):
     """ This node contains one or more other nodes but does not directly contain text."""
-    def __init__(self, parent):
-        super().__init__(parent)
+
+    def __init__(self, parent, start_line, end_line):
+        super().__init__(parent, start_line, end_line)
         self.children = []
         
     def add_node(self, node):
@@ -246,8 +298,8 @@ class Section(Container):
     """ This type of Container starts with a heading, or at the beginning of the file.
     It may have a set of properties from a "drawer". 
     """
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, start, end):
+        super().__init__(parent, start, end)
         self.heading = None
         
     def add_node(self, node):
@@ -284,8 +336,8 @@ class Paragraph(Container):
     but does not start with a header. Cannot be the top level container, so it
     must have a parent.
     """
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, start, end):
+        super().__init__(parent, start, end)
         
     def to_html(self, indent_level):
         lines = []
@@ -301,9 +353,22 @@ class Paragraph(Container):
 class Text(Node):
     """ A node that has actual content, meaning text."""
 
-    def __init__(self, parent, text):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, text, start_pos=None, end_pos=None):
+        super().__init__(parent, start_line, end_line)
         self.text = text
+        self.start_pos = start_pos
+        self.end_pos = end_pos
+        if self.start_line == self.end_line:
+            # Sometimes that caller didn't tell us position on line
+            # because the parsing code gets pretty contorted when
+            # handing nested objects like <<*/foo/*>>
+            # but we can work it out
+            if self.start_pos is None or self.end_pos is None:
+                parser = self.find_branch().parser
+                line = parser.lines[self.start_line]
+                if text in line: # sanity check
+                    self.start_pos = line.index(text)
+                    self.end_pos = self.start_pos + len(text)
 
     def to_html(self, indent_level):
         lines = []
@@ -321,8 +386,8 @@ class Heading(Container):
     """ An org heading, meaning it starts with one or more asterisks. Always starts a new
     Section, but not all Sections start with a heading. May have a parent, may not.
     """
-    def __init__(self, parent, level, original_text):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, level, original_text):
+        super().__init__(parent, start_line, end_line)
         self.level = level
         # this allows heading to be a link target by text match
         self.original_text = original_text
@@ -361,10 +426,12 @@ class TargetText(Text):
     it can be the target of a link. This is for the <<link-to-text>> form which
     needs special processing on conversion to other formats. 
     """
-    def __init__(self, parent, text):
-        super().__init__(parent, text)
+    def __init__(self, parent, start_line, start_pos, end_pos, text):
+        super().__init__(parent, start_line, start_line, text)
         root = self.find_root()
         root.add_link_target(self, text)
+        self.start_pos = start_pos
+        self.end_pos = end_pos
 
 class LinkTarget():
     """
@@ -403,9 +470,11 @@ class LinkTarget():
 
 class TextTag(Container):
 
-    def __init__(self, parent, simple_text):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, start_pos, end_pos, simple_text):
+        super().__init__(parent, start_line, start_line)
         self.simple_text = simple_text
+        self.start_pos = start_pos
+        self.end_pos = end_pos
     
     def get_css_styles(self):
         return [dict(name="font-weight", value="bold"),]
@@ -457,8 +526,8 @@ class CenterBlock(Container):
     
 class QuoteBlock(Container):
 
-    def __init__(self, parent, cite=None, content=None):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, cite=None, content=None):
+        super().__init__(parent, start_line, end_line)
         self.cite = cite
         self.children = []
         if content:
@@ -510,14 +579,14 @@ class ExportBlock(CodeBlock):
 
 class List(Container):
 
-    def __init__(self, parent,  margin=None):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line,  margin=None):
+        super().__init__(parent, start_line, end_line)
         self.margin = margin
 
 class ListItem(Container):
 
-    def __init__(self, parent, line_contents=None):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, line_contents=None):
+        super().__init__(parent, start_line, end_line)
         self.line_contents = []  #index into children of the items on the line, other childen possible
         if line_contents:
             for item in line_contents:
@@ -570,8 +639,8 @@ class OrderedList(List):
 
 class OrderedListItem(ListItem):
 
-    def __init__(self, parent, ordinal=None, line_contents=None):
-        super().__init__(parent, line_contents)
+    def __init__(self, parent, start_line, end_line, ordinal=None, line_contents=None):
+        super().__init__(parent, start_line, end_line, line_contents)
         self.ordinal = ordinal
 
 
@@ -608,8 +677,8 @@ class DefinitionList(List):
 
 class DefinitionListItem(ListItem):
 
-    def __init__(self, parent, title, description):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, title, description):
+        super().__init__(parent, start_line, end_line)
         # This is pretty ugly, but it is that way
         # because the stuff it is manipulating is optimized
         # for the common case. This is not the common case.
@@ -721,11 +790,13 @@ class TableCell(Container):
 
 class Link(Container):
 
-    def __init__(self, parent, target_text, display_text=None):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, start_pos, end_pos, target_text, display_text=None):
+        super().__init__(parent, start_line, start_line)
         self.children = []
         self.target_text = target_text
         self.display_text = display_text
+        self.start_pos = start_pos
+        self.end_pos = end_pos
 
     def to_html(self, indent_level):
         lines = []
@@ -804,8 +875,8 @@ tell the difference.
 """
 class Image(Node):
     
-    def __init__(self, parent, src_text, alt_text=None):
-        super().__init__(parent)
+    def __init__(self, parent, start_line, end_line, src_text, alt_text=None):
+        super().__init__(parent, start_line, end_line)
         self.src_text = src_text
         self.alt_text = alt_text
 

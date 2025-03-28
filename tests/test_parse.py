@@ -1,14 +1,17 @@
 import sys
 import logging
 import json
+from io import StringIO
 from pathlib import Path
 from pprint import pprint, pformat
 import pytest
+from unittest.mock import patch
 from roam2doc.parse import (DocParser, MatchHeading, MatchTable, MatchList,
                             MatchQuote, MatchCenter, MatchExample,
                             ParagraphParse, MatcherType, ToolBox, SectionParse)
-from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine)
-from setup_logging import setup_logging
+from roam2doc.tree import (OrderedList, OrderedListItem, BlankLine, Section)
+from roam2doc.setup_logging import setup_logging
+from roam2doc.cli import main
 
 setup_logging(default_level="debug")
 
@@ -215,10 +218,16 @@ def test_file_starts_with_second_section():
         all_lines = s1_lines + s2_lines
         text = '\n'.join(all_lines)
         doc_parser =  DocParser(text, name)
-        res = doc_parser.parse()
-        assert len(res['sections']) == 2, f"{name} section 1 should have two sections"
-        section_1 = res['sections'][0]
-        section_2 = res['sections'][1]
+        branch = doc_parser.parse()
+        root = branch.root
+        sections = []
+        for child in branch.children:
+            assert isinstance(child, Section)
+            sections.append(child)
+            
+        assert len(sections) == 2, f"{name} section 1 should have two sections"
+        section_1 = sections[0]
+        section_2 = sections[1]
         target = 0
         if name == "file_start_with_props.org":
             target = 3
@@ -226,13 +235,13 @@ def test_file_starts_with_second_section():
             target = 4
         elif name == "file_start_with_only_title.org":
             target = 1
-        assert section_1.start == target, f"{name} section 1 should start section at {target}"
+        assert section_1.start_line == target, f"{name} section 1 should start section at {target}"
         s1_end = len(s1_lines) - 1
-        assert section_1.end == s1_end, f"{name} section 1 should end section at {s1_end}"
+        assert section_1.end_line == s1_end, f"{name} section 1 should end section at {s1_end}"
         s2_start = s1_end + 1
         s2_end = s2_start + len(s2_lines)  - 1
-        assert section_2.start == s2_start, f"{name} section 2 should start section at {s2_start}"
-        assert section_2.end == s2_end, f"{name} section 2 should end section at {s2_end}"
+        assert section_2.start_line == s2_start, f"{name} section 2 should start section at {s2_start}"
+        assert section_2.end_line == s2_end, f"{name} section 2 should end section at {s2_end}"
         # make sure output is produced without blowing up
         doc_parser.root.to_html()
 
@@ -258,6 +267,105 @@ def test_file_all_nodes():
     doc_parser.root.to_html()
     doc_parser.root.to_html(make_pretty=False, include_json=True)
 
+def test_cli():
+    with patch('sys.stdout', new=StringIO()) as fake_out:
+        this_dir = Path(__file__).resolve().parent
+        org_file = Path(this_dir, 'org_files', 'examples', 'objects.org')
+        with patch('sys.argv', ['tester', str(org_file)]):
+            parsers = main()
+            assert "bold_text</b>" in fake_out.getvalue()
+        b1 = parsers[0].branch
+        sec = b1.children[0]
+        blank = sec.children[0]
+        para = sec.children[1]
+        first_bold = para.children[1]
+        assert first_bold.simple_text == "bold_text"
+        assert(first_bold.get_source_data()['source']) == "*bold_text*"
+        with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo', '--overwrite']):
+            parsers = main()
+        b1 = parsers[0].branch
+        sec = b1.children[0]
+        blank = sec.children[0]
+        para = sec.children[1]
+        first_bold = para.children[1]
+        assert first_bold.simple_text == "bold_text"
+        with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo']):
+            with pytest.raises(SystemExit):
+                parsers = main()
+        with patch('sys.argv', ['tester', str(org_file), '--output', '/directory_that_does_not_exist/foo']):
+            with pytest.raises(SystemExit):
+                parsers = main()
+        
+        
+def test_roam_combine_1():
+   
+    def do_checks(b2):
+        sec = b2.children[0]
+        para = sec.children[1]
+        link1 = para.children[0]
+        link2 = para.children[1]
+        in_text = link2.children[0]
+        sd = in_text.get_source_data()
+        source = sd['source']
+        assert "ID style" in source and "section 2 by property" in source
+        t2 = para.children[2]
+        if False:
+            print("link1=")
+            pprint(link1.get_source_data())
+
+    this_dir = Path(__file__).resolve().parent
+    target_dir = Path(this_dir, 'org_files', 'roam1')
+    list_file = Path(target_dir, 'roam_combine1.list')
+    with patch('sys.argv', ['tester', str(list_file), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
+    do_checks(parsers[1].branch)
+    with patch('sys.argv', ['tester', str(target_dir), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
+    do_checks(parsers[1].branch)
+            
+def test_objects_para():
+   
+    this_dir = Path(__file__).resolve().parent
+    org_file = Path(this_dir, 'org_files', 'examples', 'objects.org')
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
+
+    b1 = parsers[0].branch
+    sec = b1.children[0]
+    blank = sec.children[0]
+    para = sec.children[1]
+    sd = para.get_source_data()
+    pos = 0
+    if False:
+        for obj in para.children:
+            print(pos)
+            sd = obj.get_source_data()
+            pprint(sd)
+            pos += 1
+
+    first_bold = para.children[1]
+    assert first_bold.simple_text == "bold_text"
+    assert(first_bold.get_source_data()['source']) == "*bold_text*"
+
+    first_italic = para.children[4]
+    assert first_italic.simple_text == "italic_text"
+    assert(first_italic.get_source_data()['source']) == "/italic_text/"
+
+    first_uline = para.children[7]
+    assert first_uline.simple_text == "underlined_text"
+    assert(first_uline.get_source_data()['source']) == "_underlined_text_"
+
+    first_struck = para.children[10]
+    assert first_struck.simple_text == "linethrough_text"
+    assert(first_struck.get_source_data()['source']) == "+linethrough_text+"
+
+    first_verbatim = para.children[13]
+    assert first_verbatim.simple_text == "verbatim_text"
+    assert(first_verbatim.get_source_data()['source']) == "=verbatim_text="
+
+    last_code = para.children[17]
+    assert last_code.simple_text == "code containing = sign "
+    assert(last_code.get_source_data()['source']) == "~code containing = sign ~"
 
 
 def gen_top_lists():
@@ -318,51 +426,6 @@ def gen_mixed_elems():
     
     buff = '\n'.join(lines)
     return buff
-    
-    
-def gen_no_elems():
-    lines = []
-    lines.append('* Section 1 heading')
-    lines.append('')
-    lines.append('')
-
-    lines.append('This will be a paragraph.')
-    lines.append('This continues the paragraph.')
-    lines.append('The next line (blank) will end the paragraph.')
-    lines.append('')
-    lines.append('This will be a second paragraph. ')
-    lines.append('The following blank lines will end it.')
-    lines.append('The following next two blank will also be part of the paragraph.')
-    lines.append('They should be part of the section directly')
-    lines.append('')
-    lines.append('')
-    lines.append('')
-    lines.append('This will be a second paragraph. ')
-    lines.append('* Section 2 heading')
-    lines.append('** Section 3 heading')
-    lines.append('* Section 4 heading')
-
-    buff = '\n'.join(lines)
-    return buff
-    
-
-def gen_objects():
-
-    lines = []
-    lines.append('* Section 1 heading')
-    lines.append('')
-    lines.append('Paragraph starts')
-    lines.append("*bold_text* *more_bold_text* *even more but with spaces*")
-    lines.append("/italic_text/ /more_italic_text/ /spaced italic text/")
-    lines.append("_underlined_text_ _more_underlined_text_ _underlined and spaces_")
-    lines.append("+linethrough_text+ +more_linethrough_text+ +spaces in line through+")
-    lines.append("=verbatim_text= =more verbatim text=")
-    lines.append("~code_text~ ~more code text~ ~code containing = sign ~")
-    lines.append('')
-    buff = '\n'.join(lines)
-    return buff
-
-    
     
 def gen_def_list():
     lines = []
@@ -478,38 +541,3 @@ def gen_big_mix():
     buff = '\n'.join(lines)
     return buff
     
-def test_1():
-    lines = []
-    lines.append(':PROPERTIES:')
-    lines.append(':ID: 0000-1111')
-    lines.append(':END:')
-    lines.append('* A heading with *bold*!')
-    lines.append('** A sub heading with */bold italiacs/* !')
-    lines.append('')
-    lines.append('* Section 2* !')
-    lines.append(':PROPERTIES:')
-    lines.append(':ID: 0000-2222')
-    lines.append(':END:')
-    lines.append('[[target][*/bold iti/*]]')
-    lines.append('')
-    lines.append('<<target>>')
-    
-    buff = '\n'.join(lines)
-
-    lines_2 = []
-    lines_2.append('* Section one heading for doc two')
-    lines_2.append('')
-    lines_2.append('[[id:0000-1111][ID style link to doc one at file level]]')
-    lines_2.append('[[id:0000-2222][ID style link to doc one at section 2 by property drawer]]')
-    lines_2.append('')
-
-    
-    buff_2 = '\n'.join(lines_2)
-    doc_parser = DocParser(buff, "inline")
-    b1 = doc_parser.parse()
-
-    doc_parser2 = DocParser(buff_2, "inline2", root=doc_parser.root)
-    b2 = doc_parser2.parse()
-    
-    #print(json.dumps(b2.to_json_dict(), indent=2))
-    print('\n'.join(b1.to_html(0)))

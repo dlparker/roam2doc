@@ -5,10 +5,10 @@
 5. [X] Make Tables find objects
 6. [X] Make list items find objects
 7. [ ] Document object parsing limitations, just name what is parsed and where
-   1. Bold text not allowed in headings, heading will be converted to regular/bold text
-   2. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
-8. [ ] Figure out some method for the caller of to_html to supply css, maybe a callback
-9. [ ] Create io.py to manage input and output
-10. [ ] Do some css stuff, look at https://orgmode.org/manual/CSS-support.html and https://github.com/gongzhitaao/orgcss?tab=readme-ov-file
-11. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation
+   1. Drawers that are not heading or file property drawers a not parsed, just treated as text
+   2. Keywords are stipped from text, and only #+NAME: keywords have effect: allowing links to named element
+   3. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
+8. [ ] Allow user to supply css and javascript files on command line, to be merged into <head> by reference
+9. [X] Create io.py to manage input and output
+10. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation, and add it to cli.py
    
