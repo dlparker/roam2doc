@@ -44,16 +44,31 @@ def parse_from_filelist(filepath):
     return parse_fileset(targets)
             
 if __name__=="__main__":
-    tdir = sys.argv[1]
-    if Path(tdir).is_dir():
-        res = parse_directory(tdir)
-        print(res[0].root.to_html())
-    elif tdir.endswith('.org'):
-        res = parse_file(tdir)
-        print(res.root.to_html())
+    if len(sys.argv) < 2:
+        print("You must supply a file or directory name")
+        raise SystemExit(1)
+    target = sys.argv[1]
+    if Path(target).is_dir():
+        res = parse_directory(target)
+        root = res[0].root
+    elif target.endswith('.org'):
+        res = parse_file(target)
+        root = res.root
     else:
-        res = parse_from_filelist(tdir)
-        print(res[0].root.to_html())
+        res = parse_from_filelist(target)
+        root = res[0].root
+    if len(sys.argv) > 2:
+        outfilepath = Path(sys.argv[2])
+        if outfilepath.exists():
+            print(f"refusing to overwrite file {outfilepath}")
+            raise SystemExit(1)
+        if not outfilepath.parent.exists():
+            print(f"output directory {outfilepath.parent} does not exist")
+            raise SystemExit(1)
+        with open(outfilepath, 'w', encoding="utf-8") as f:
+            f.write(root.to_html())
+    else:
+        print(root.to_html())
         
 
     
