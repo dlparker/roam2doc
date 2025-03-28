@@ -2,6 +2,7 @@ import sys
 import json
 import argparse
 from pathlib import Path
+from subprocess import Popen
 import logging
 from roam2doc.io import parse_fileset, parse_one_file, parse_directory, parse_from_filelist 
 from roam2doc.setup_logging import setup_logging
@@ -42,9 +43,39 @@ def setup_parser():
         action="store_true",
         help="Allow overwriting existing output file (default: False)"
     )
+    if check_for_converter():
+        parser.add_argument(
+            "--pdf",
+            action="store_true",
+            help="Use wkhtmltopdf to convert output to PDF"
+        )
+    
     return parser
 
-def process_input(input_path, logging_level, doc_type, output_path=None, allow_overwrite=False):
+def check_for_converter(): # pragma: no cover
+    try:
+        x = Popen(['wkhtmltopdf', '-V'])
+    except FileNotFoundError:
+        return False
+    res,error = x.communicate()
+    if not error:
+        return True
+    
+def convert_to_pdf(tmpf, target_path):
+
+    xsl_path = Path(Path(__file__).parent.resolve(), "default.xsl")
+    x = Popen(['wkhtmltopdf',
+               'toc',
+               '--xsl-style-sheet',
+               str(xsl_path),
+               '--enable-internal-links',
+               '--enable-local-file-access',
+               tmpf,
+               str(target_path)])
+    res,error = x.communicate()
+    
+    
+def process_input(input_path, logging_level, doc_type, output_path=None, allow_overwrite=False, make_pdf=False):
     """Process the input and generate HTML output."""
 
     # ensure output request (if any) makes sense before parsing
@@ -79,6 +110,13 @@ def process_input(input_path, logging_level, doc_type, output_path=None, allow_o
     elif doc_type == "json":
         output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
+        if make_pdf:
+            tmp_path = Path(str(output_path) + ".html")
+            with open(tmp_path, 'w', encoding="utf-8") as f:
+                f.write(output_text)
+            convert_to_pdf(tmp_path, output_path)
+            tmp_path.unlink()
+            return parsers
         with open(output_path, 'w', encoding="utf-8") as f:
             f.write(output_text)
         if doc_type == "html":
@@ -100,7 +138,7 @@ def main():
 
     # Process the input and output
     try:
-        parsers = process_input(args.input, args.logging, args.doc_type, args.output, args.overwrite)
+        parsers = process_input(args.input, args.logging, args.doc_type, args.output, args.overwrite, args.pdf)
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         raise SystemExit(1)
