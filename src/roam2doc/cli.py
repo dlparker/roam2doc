@@ -30,7 +30,7 @@ def setup_parser():
     )
     parser.add_argument(
         "-t", "--doc_type",
-        choices=['html', 'json'],
+        choices=['html', 'json', 'latex'],
         default='html',
         help="Output file path for HTML (default: html)"
     )
@@ -56,7 +56,7 @@ def setup_parser():
         if "patched" not in res:
             help += " (Links and Table of Contents Unavailable)"
         parser.add_argument(
-            "--pdf",
+            "--wk_pdf",
             action="store_true",
             help=help
         )
@@ -128,10 +128,12 @@ def process_input(args):
     # Handle output
     if args.doc_type == "html":
         output_text = root.to_html(include_json=args.include_json)
+    elif args.doc_type == "latex":
+        output_text = root.to_latex()
     elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
-        if args.pdf:
+        if args.wk_pdf:
             tmp_path = Path(str(output_path) + ".html")
             with open(tmp_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
