@@ -44,11 +44,15 @@ def setup_parser():
         action="store_true",
         help="Allow overwriting existing output file (default: False)"
     )
-    if check_for_converter():
+    res = check_for_converter()
+    if res:
+        help = "Use wkhtmltopdf to convert output to PDF"
+        if "patched" not in res:
+            help += " (Links and Table of Contents Unavailable)"
         parser.add_argument(
             "--pdf",
             action="store_true",
-            help="Use wkhtmltopdf to convert output to PDF"
+            help=help
         )
     
     return parser
@@ -59,20 +63,29 @@ def check_for_converter(): # pragma: no cover
     except FileNotFoundError:
         return False
     res,error = x.communicate()
-    if not error:
-        return True
+    if error:
+        return False
+    return str(res)
     
 def convert_to_pdf(tmpf, target_path):
 
-    xsl_path = Path(Path(__file__).parent.resolve(), "default2.xsl")
-    x = Popen(['wkhtmltopdf',
+    cs = check_for_converter()
+    if "patched" in cs:
+        command = ['wkhtmltopdf',
                'toc',
                '--xsl-style-sheet',
                str(xsl_path),
                '--enable-internal-links',
                '--enable-local-file-access',
                tmpf,
-               str(target_path)])
+               str(target_path)]
+    else:
+        command = ['wkhtmltopdf',
+                   '--enable-local-file-access',
+                   tmpf,
+                   str(target_path)]
+    xsl_path = Path(Path(__file__).parent.resolve(), "default2.xsl")
+    x = Popen(command)
     res,error = x.communicate()
     
     
