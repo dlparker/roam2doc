@@ -340,10 +340,12 @@ class Paragraph(Container):
     def __init__(self, parent, start, end):
         super().__init__(parent, start, end)
         
-    def to_html(self, indent_level):
+    def to_html(self, indent_level, zero_top_margin=False):
         lines = []
         indent_level += 1
         padding, line1 = setup_tag_open("p", indent_level, self)
+        if zero_top_margin:
+            line1 += ' style="margin-top: 0 !important" '
         line1 += ">"
         lines.append(line1)
         for node in self.children:
@@ -616,7 +618,10 @@ class ListItem(Container):
         line1 += ">"
         lines.append(line1)
         for node in self.children:
-            lines.extend(node.to_html(indent_level))
+            if isinstance(node, Paragraph):
+                lines.extend(node.to_html(indent_level, zero_top_margin=True))
+            else:
+                lines.extend(node.to_html(indent_level))
         lines.append(padding + '</li>')
         return lines
 

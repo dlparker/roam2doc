@@ -302,7 +302,7 @@ class SectionParse(ParseTool):
         if found_heading:
             pos += 1
         self.tree_node = Section(self.parent_tree_node, self.start, self.end)
-        heading = Heading(self.tree_node, self.level, self.start, self.start, self.heading_text)
+        heading = Heading(self.tree_node, self.start, self.start, self.level, self.heading_text)
         tool_box = ToolBox(self.doc_parser)
         objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text, pos)
         if self.end == self.start:
@@ -470,7 +470,10 @@ class LesserElementParse(ParseTool):
         # are "wrapped' with #+begin_xxx #+end_xxx
         start = self.start + 1
         end = self.end -1
-        buff = '\n'.join(self.doc_parser.lines[start:end + 1])
+        my_lines = []
+        for line in self.doc_parser.lines[start:end + 1]:
+            my_lines.append(line.lstrip().lstrip(','))
+        buff = '\n'.join(my_lines)
         tree_node = self.tree_class(self.parent_tree_node, start, end, buff)
         if self.end_callback:
             self.end_callback(self)

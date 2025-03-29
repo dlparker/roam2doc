@@ -8,7 +8,8 @@
    1. Drawers that are not heading or file property drawers a not parsed, just treated as text
    2. Keywords are stipped from text, and only #+NAME: keywords have effect: allowing links to named element
    3. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
-8. [ ] Allow user to supply css and javascript files on command line, to be merged into <head> by reference
 9. [X] Create io.py to manage input and output
-10. [ ] Remember to add --enable-local-file-access to wkhtmltopdf invocation, and add it to cli.py
-   
+10. [X] Remember to add --enable-local-file-access to wkhtmltopdf invocation, and add it to cli.py
+
+Possible future enhancements
+1. [ ] Allow user to supply css and javascript files on command line, to be merged into <head> by reference

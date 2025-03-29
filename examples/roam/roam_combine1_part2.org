@@ -1,0 +1,7 @@
+* Section one heading for doc two
+
+[[id:0000-1111][ID style link to doc one at file level]]
+[[id:0000-2222][ID style link to doc one at section 2 by property drawer]]
+
+Some text before the target <<target2>>
+

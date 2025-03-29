@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 import json
 import argparse
@@ -31,7 +32,12 @@ def setup_parser():
         "-t", "--doc_type",
         choices=['html', 'json'],
         default='html',
-        help="Output file path for HTML (default: print to stdout)"
+        help="Output file path for HTML (default: html)"
+    )
+    parser.add_argument(
+        "-j", "--include_json",
+        action="store_true",
+        help="Include a json version of the parsed document tree in the html head section",
     )
     parser.add_argument(
         "-l", "--logging",
@@ -89,23 +95,24 @@ def convert_to_pdf(tmpf, target_path):
     res,error = x.communicate()
     
     
-def process_input(input_path, logging_level, doc_type, output_path=None, allow_overwrite=False, make_pdf=False):
+def process_input(args):
     """Process the input and generate HTML output."""
 
     # ensure output request (if any) makes sense before parsing
-    if output_path:
-        output_path = Path(output_path)
-        if output_path.exists() and not allow_overwrite:
+    output_path = None
+    if args.output:
+        output_path = Path(args.output)
+        if output_path.exists() and not args.overwrite:
             logger.error(f"Refusing to overwrite existing file {output_path}")
             raise SystemExit(1)
         if not output_path.parent.exists():
             logger.error(f"Output directory {output_path.parent} does not exist")
             raise SystemExit(1)
-    else:
-        if logging_level:
-            setup_logging(default_level=logging_level)
+        if args.logging:
+            setup_logging(default_level=args.logging)
 
-    input_path = Path(input_path)
+
+    input_path = Path(args.input)
     
     # Determine input type and parse accordingly
     if input_path.is_dir():
@@ -119,12 +126,12 @@ def process_input(input_path, logging_level, doc_type, output_path=None, allow_o
     root = parsers[0].root
 
     # Handle output
-    if doc_type == "html":
-        output_text = root.to_html()
-    elif doc_type == "json":
+    if args.doc_type == "html":
+        output_text = root.to_html(include_json=args.include_json)
+    elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
-        if make_pdf:
+        if args.pdf:
             tmp_path = Path(str(output_path) + ".html")
             with open(tmp_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
@@ -133,9 +140,9 @@ def process_input(input_path, logging_level, doc_type, output_path=None, allow_o
             return parsers
         with open(output_path, 'w', encoding="utf-8") as f:
             f.write(output_text)
-        if doc_type == "html":
+        if args.doc_type == "html":
             logger.info(f"HTML written to {output_path}")
-        elif doc_type == "json":
+        elif args.doc_type == "json":
             logger.info(f"JSON written to {output_path}")
     else:
         print(output_text)
@@ -152,7 +159,7 @@ def main():
 
     # Process the input and output
     try:
-        parsers = process_input(args.input, args.logging, args.doc_type, args.output, args.overwrite, args.pdf)
+        parsers = process_input(args)
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         raise SystemExit(1)
