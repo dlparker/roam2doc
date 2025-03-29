@@ -1,0 +1,21 @@
+I think this is probably a fresh session so you don't remember working on git@github.com:dlparker/roam2doc.git with me.
+
+A couple of weeks ago you were helping me with research for a possible
+story. We discussed the best way for me to provide context for questions when
+prompting you for help. I want to use emacs org-roam techniques for note taking,
+and there is no existing simple way to make those available and accessible to
+your. So, being an experienced python programmer, I started with some example
+code and started working on a toolkit for converting the org files to html
+with working links between the files preserved, and then converting that to
+PDF.
+
+Attached is my first real document built using org-roam source files and my roam2doc toolkit.
+I hope you are happy with it since being able to generate such documents to upload to you
+was the sole reason that I undertook that SURPRISINGLY DIFFICULT task.
+
+The org doc structure is so irregular, it was quit a challenge. I am sure I will find more bugs,
+but if you look in the tests/org_files/examples directory the all_nodes.org file contains a fairly
+complete set what my tool can parse and render into html. Plus roam links, which are trivial when
+you put the files together in one context.
+Can you detect and make sense of the links in the PDF?
+

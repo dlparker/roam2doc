@@ -2,6 +2,7 @@ import sys
 import json
 import argparse
 from pathlib import Path
+import subprocess
 from subprocess import Popen
 import logging
 from roam2doc.io import parse_fileset, parse_one_file, parse_directory, parse_from_filelist 
@@ -54,7 +55,7 @@ def setup_parser():
 
 def check_for_converter(): # pragma: no cover
     try:
-        x = Popen(['wkhtmltopdf', '-V'])
+        x = Popen(['wkhtmltopdf', '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError:
         return False
     res,error = x.communicate()
@@ -63,7 +64,7 @@ def check_for_converter(): # pragma: no cover
     
 def convert_to_pdf(tmpf, target_path):
 
-    xsl_path = Path(Path(__file__).parent.resolve(), "default.xsl")
+    xsl_path = Path(Path(__file__).parent.resolve(), "default2.xsl")
     x = Popen(['wkhtmltopdf',
                'toc',
                '--xsl-style-sheet',
