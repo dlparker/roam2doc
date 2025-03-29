@@ -29,10 +29,16 @@
 
       
 * Things to know   
+** Things it does that might surpise you
+- Org Keyword strings are stripped from the text during parsing. The only keyword that has
+  any effect is the #+NAME: keyword, which (if at line beginning) is applied to the next
+  non-keyword line. This allows you to name an element (e.g. a table) and then link to
+  it by name
 ** Things it doesn't do and probably should
 - Footnotes are not parsed, they will be treated as ordinary text
 - Drawers that are either property drawers at the beginning of a file or are property drawers for
   heaading are parsed, all other drawers are not parsed, just treated as text.
+- Verbatim strings cannot contain equal sign "=", use ~ (inline code) if you need that in your text.
 ** Things it doesn't do and maybe never will
 - Parse and do something useful with the time management aspects of org files, this
 - Inlinetasks are not parsed, they will be treated as headings an will make things ugly

@@ -4,7 +4,7 @@
 4. [X] Make Paras find objects
 5. [X] Make Tables find objects
 6. [X] Make list items find objects
-7. [ ] Document object parsing limitations, just name what is parsed and where
+7. [X] Document object parsing limitations, just name what is parsed and where
    1. Drawers that are not heading or file property drawers a not parsed, just treated as text
    2. Keywords are stipped from text, and only #+NAME: keywords have effect: allowing links to named element
    3. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
