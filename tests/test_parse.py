@@ -84,14 +84,13 @@ def test_parser_stack():
 
 
 def test_latex():
-    file_start =  "file_start_with_props_and_title.org"
-    start = get_frag_file_contents(file_start)
-    list_part = get_frag_file_contents("ordered_flat_list_with_objects.org")
-    contents = start + list_part
+    #path, contents =get_example_file_path_and_contents("min.org")
+    path, contents =get_example_file_path_and_contents("all_nodes.org")
     doc_parser =  DocParser(contents, "")
     branch = doc_parser.parse()
     root = branch.root
-    print(root.to_latex())
+    res = root.to_latex(title="Parse of all nodes")
+    print(res)
     
 
 def test_flat_ordered_list():

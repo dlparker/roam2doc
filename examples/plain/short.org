@@ -56,3 +56,23 @@ this other text should be in Section 2-2 after list
 | d | a link inside a cell! ->[[Section 2 heading][see: section 2]] |
 
 
+* a section
+- unordered list starts
+  - unordered sub 1
+    - unordered sub 1 subsub 1
+  - unordered sub 2 *bold text*
+- unordered second 
+  + foo :: a word ofen used by programmers
+  + bar :: another word ofen used by programmers
+    + foobar :: see a pattern?
+    + beebop :: <<arubop>>
+  Some text as a paragraph in an item!!!
+  and a link [[Section 1 heading][*/back to the top!/*]]
+  and an embedded table!!
+    | xx | *this item is bold* |
+    | yy | /this item is italian/ |
+
+
+ */+bold italic strikethrough+/*
+
+a link [[paragraph][link to section 1 first line word paragraph]]

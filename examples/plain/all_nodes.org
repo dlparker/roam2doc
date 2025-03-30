@@ -2,6 +2,7 @@
 :ID: 00000000-0000-0000-0000-000000000001
 :END:
 #+title: The File
+#+OPTIONS: broken-links:mark
 * Heading Level 1
 ** Heading Level 2
 *** Heading Level 3
@@ -11,9 +12,7 @@
 * Section 1 heading
 ** Section 1 subsection 1 heading and it has */some/* ~objects~
 *** level 3 section
-**** level 4 section
-***** level 5 section
-****** level 6 section
+**** level 4 section (Don't go deeper than 4, latex doesn't like it
 
 1. some *bold* text
 2. some /italic/ text 
@@ -114,9 +113,7 @@ To fill in the bottom of the page to make the link traverse to the list more obv
 a link [[Section 1 heading][*/back to the top!/*]]
 
 **** Heading Level 4
-***** Heading Level 5
-****** Heading Level 6
-this text is in section 6
+this text is in section 4
 
        
 

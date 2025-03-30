@@ -1,3 +1,5 @@
+import re
+import getpass
 import json
 import logging
 
@@ -55,27 +57,34 @@ class Root:
     def add_css_class(self, class_spec):
         self.css_classes[class_spec['name']] = class_spec
         
-    def to_latex(self, wrap=True, do_index=True):
+    def to_latex(self, wrap=True, do_index=True, title=None, author=None):
+        if title is None:
+            title = tex_escape(f"roam2doc parse of {self.source}")
+        if author is None:
+            author = tex_escape(getpass.getuser())
         lines = []
         if wrap:
-            lines.extend([
-                r"\documentclass[a4paper,12pt]{article}",
-                r"\usepackage[utf8]{inputenc}",
-                r"\usepackage{hyperref}",
-                r"\usepackage{makeidx}",
-                r"\usepackage{geometry}",
-                r"\geometry{margin=1in}",
-                r"\makeindex",
-                r"\begin{document}",
-                r"\title{Roam2Doc World-Building Notes}",
-                r"\author{}",
-                r"\date{}",
-                r"\maketitle",
-                r"\tableofcontents",
-                r"\newpage",
-            ])
-            lines.extend(self.trunk.to_latex(0))
-        if do_index:
+            lines.append('% Intended LaTeX compiler: pdflatex')
+            lines.append(r'\documentclass[11pt]{article}')
+            lines.append(r'\usepackage[utf8]{inputenc}')
+            lines.append(r'\usepackage[T1]{fontenc}')
+            lines.append(r'\usepackage{graphicx}')
+            lines.append(r'\usepackage{longtable}')
+            lines.append(r'\usepackage{wrapfig}')
+            lines.append(r'\usepackage{rotating}')
+            lines.append(r'\usepackage[normalem]{ulem}')
+            lines.append(r'\usepackage{amsmath}')
+            lines.append(r'\usepackage{amssymb}')
+            lines.append(r'\usepackage{capt-of}')
+            lines.append(r'\usepackage{hyperref}')
+            lines.append(r'\author{' + f"{author}" + '}')
+            lines.append(r'\date{\today}')
+            lines.append(r'\title{' + f"{title}" + '}')
+            lines.append(r'\begin{document}')
+            lines.append(r'\maketitle')
+            lines.append(r'\tableofcontents')
+            lines.extend(self.trunk.to_latex())
+        if do_index and False:
             lines.append(r"\printindex")
         if wrap:
             lines.append(r"\end{document}")
@@ -171,10 +180,10 @@ class Branch:
                    source=self.source, nodes=[n.to_json_dict() for n in self.children]))
         return res
 
-    def to_latex(self, indent_level):
+    def to_latex(self):
         lines = []
         for node in self.children:
-            lines.extend(node.to_latex(indent_level))
+            lines.extend(node.to_latex())
         return lines
 
     def to_html(self, indent_level):
@@ -265,8 +274,8 @@ class Node:
         data['source'] = source
         return data
 
-    def to_latex(self, indent_level):
-        return [f"class {self.__class__.__name__} has no to\_latex method",]
+    def to_latex(self):
+        return [f"class {self.__class__.__name__} has no to_latex method",]
     
     def __str__(self):
         msg = f"({self.node_id}) {self.__class__.__name__} "
@@ -286,6 +295,9 @@ class BlankLine(Node):
     def __init__(self, parent, start_line, end_line):
         super().__init__(parent, start_line, end_line)
     
+    def to_latex(self):
+        return [r"\vspace{\baselineskip}"]  # Adds a blank line's worth of space
+        
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -313,7 +325,7 @@ class Container(Node):
         except ValueError:
             pass
         
-    def to_latex(self, indent_level):
+    def to_latex(self):
         lines = []
         return lines
     
@@ -348,16 +360,16 @@ class Section(Container):
             return
         super().add_node(node)
 
-    def to_latex(self, indent_level):
+    def to_latex(self):
         lines = []
-        if self.heading:
-            level = min(self.heading.level, 4)  # Cap at \paragraph
-            cmd = {1: "section", 2: "subsection", 3: "subsubsection", 4: "paragraph"}.get(level, "paragraph")
-            title = self.heading.get_plain_text().replace("#", r"\#")  # Escape special chars
-            lines.append(f"\\{cmd}{{{title}}}\\label{{obj-{self.node_id}}}")
-            lines.append(f"\\index{{{'*' * self.heading.level} {title}|obj-{self.node_id}}}")
+        # if there is no heading, parse is broken, it is suppled to generate one
+        # if the zeroth section has no heading, all other sections begin with
+        # a heading by definition
+        lines.extend(self.heading.to_latex("start"))
         for node in self.children:
-            lines.extend(node.to_latex(indent_level))
+            if node != self.heading:
+                lines.extend(node.to_latex())
+        lines.extend(self.heading.to_latex("end"))
         return lines
 
     def to_html(self, indent_level):
@@ -391,10 +403,10 @@ class Paragraph(Container):
     def __init__(self, parent, start, end):
         super().__init__(parent, start, end)
 
-    def to_latex(self, indent_level):
+    def to_latex(self):
         lines = []
         for node in self.children:
-            lines.extend(node.to_latex(indent_level))
+            lines.extend(node.to_latex())
         lines.append("")  # Blank line for paragraph break
         return lines
 
@@ -433,6 +445,11 @@ class Text(Node):
 
     def get_plain_text(self):
         return self.text
+
+    def to_latex(self):
+        # Escape special LaTeX characters
+        text = tex_escape(self.text)
+        return [text]
     
     def to_html(self, indent_level):
         lines = []
@@ -465,7 +482,49 @@ class Heading(Container):
         for child in self.children:
             res += f" {child.get_plain_text()}"
         return res
-    
+
+    def to_latex(self, part="start"):
+        # headings get turned into sections so we include the latex markup
+        # for that in the results
+        mode_dict = {1: "section",
+                     2: "subsection",
+                     3: "subsubsection",
+                     4: "enumerate",
+                     5: "enumerate"}
+
+        if not self.level in mode_dict:
+            title_line = []
+            for child in self.children:
+                title_line.extend(child.to_latex())
+            title = " ".join(title_line).lstrip()
+            return [title,]
+        keyword = mode_dict[self.level]
+        start_lines = end_lines = []
+        close_line = None
+        if part != "start":
+            if keyword == "enumerate":
+                end_lines.append(r'\end{enumerate}')
+            return end_lines
+        title_line = []
+        if self.level in mode_dict:
+            if keyword == "enumerate":
+                start_lines.append(r'\begin{enumerate}')
+                title_line.append(r'\item ')
+            else:
+                title_line.append(f'\\{keyword}' + "{")
+                close_line = "}"
+        label = f"\\label{{obj-{self.node_id}}}"
+        lines = []
+        lines.extend(start_lines)
+        for child in self.children:
+            title_line.append(' '.join(child.to_latex()))
+        if close_line:
+            title_line.append(close_line)
+        title_line.append(label)
+        title = " ".join(title_line).lstrip()
+        lines.append(title)
+        return lines
+
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -499,7 +558,7 @@ class Heading(Container):
     
         
 class TargetText(Text):
-    """ A node that has actual text content, but with special significance because
+    """ A node that has no actual text content, but with special significance because
     it can be the target of a link. This is for the <<link-to-text>> form which
     needs special processing on conversion to other formats. 
     """
@@ -510,6 +569,18 @@ class TargetText(Text):
         self.start_pos = start_pos
         self.end_pos = end_pos
 
+    def to_latex(self):
+        # Escape special LaTeX characters
+        line = f"\\label{{obj-{self.node_id}}}"
+        return [line,]
+    
+    def to_html(self, indent_level):
+        lines = []
+        indent_level += 1
+        padding, line1 = setup_tag_open("span", indent_level, self)
+        line1 += "</span>"
+        return [line1,]
+    
 class LinkTarget():
     """
     This is used to record the fact that a node has a link-to-text associated with it so that
@@ -552,8 +623,30 @@ class TextTag(Container):
         self.simple_text = simple_text
         self.start_pos = start_pos
         self.end_pos = end_pos
-    
 
+    def to_latex(self):
+        latex_tag = {
+            'b': 'textbf',  # BoldText
+            'i': 'emph',  # ItalicText
+            'u': 'underline',  # UnderlinedText
+            's': 'sout',  # LinethroughText (requires \usepackage{ulem})
+            'code': 'texttt'  # InlineCodeText, VerbatimText
+        }.get(self.tag, 'text')
+        lines = []
+        # Add a phantom section to create a hyperlink anchor
+        #lines.append(r"\phantomsection")
+        # Add a label for this target
+        #lines.append(f"\\label{{obj-{self.node_id}}}")
+        if self.simple_text:
+            text = tex_escape(self.simple_text)
+            lines.append(f"\\{latex_tag}{{{text}}}")
+            return lines
+        content = []
+        for node in self.children:
+            content.extend(node.to_latex())
+        lines.append(f"\\{latex_tag}{{{' '.join(content)}}}")
+        return lines
+    
     def get_plain_text(self):
         if self.simple_text:
             return self.simple_text
@@ -605,7 +698,23 @@ class VerbatimText(TextTag):
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
 
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{quote}")
+        for node in self.children:
+            lines.extend(node.to_latex())
+        lines.append(r"\end{quote}")
+        return lines
+
 class CenterBlock(Container):
+    
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{center}")
+        for node in self.children:
+            lines.extend(node.to_latex())
+        lines.append(r"\end{center}")
+        return lines
     
     def get_css_styles(self):
         return [dict(name="text-align", value="center"),]
@@ -620,6 +729,15 @@ class QuoteBlock(Container):
             for item in content:
                 item.move_to_parent(self)
         
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{quote}")
+        for node in self.children:
+            lines.extend(node.to_latex())
+        lines.append(r"\end{quote}")
+        if self.cite:
+            lines.append(f"--- {self.cite}")
+        return lines
     
     def to_html(self, indent_level):
         lines = []
@@ -642,6 +760,13 @@ class CodeBlock(Text):
         return [dict(name="white-space", value="pre-wrap"),
                 dict(name="font-family", value="monospace"),]
 
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{verbatim}")
+        lines.append(self.text)
+        lines.append(r"\end{verbatim}")
+        return lines
+    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -651,6 +776,7 @@ class CodeBlock(Text):
         lines.append(self.text)
         lines.append(padding + '</code>')
         return lines
+
 
 class ExampleBlock(CodeBlock):
     pass
@@ -714,11 +840,11 @@ class ListItem(Container):
     
 class OrderedList(List):
 
-    def to_latex(self, indent_level):  # For OrderedList
+    def to_latex(self):  # For OrderedList
         lines = []
         lines.append(r"\begin{enumerate}")
         for node in self.children:
-            lines.extend(node.to_latex(indent_level + 1))
+            lines.extend(node.to_latex())
         lines.append(r"\end{enumerate}")
         return lines
 
@@ -737,11 +863,11 @@ class OrderedList(List):
 
 class OrderedListItem(ListItem):
 
-    def to_latex(self, indent_level):  # For ListItem
+    def to_latex(self):  # For ListItem
         lines = []
         lines.append(r"\item")
         for node in self.children:
-            lines.extend(node.to_latex(indent_level + 1))
+            lines.extend(node.to_latex())
         return lines
 
     def __init__(self, parent, start_line, end_line, ordinal=None, line_contents=None):
@@ -751,11 +877,19 @@ class OrderedListItem(ListItem):
 
 class UnorderedList(List):
 
-    def to_latex(self, indent_level):  # For OrderedList
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{itemize}")
+        for node in self.children:
+            lines.extend(node.to_latex())
+        lines.append(r"\end{itemize}")
+        return lines
+    
+    def to_latex(self):  # For OrderedList
         lines = []
         lines.append(r"\begin{enumerate}")
         for node in self.children:
-            lines.extend(node.to_latex(indent_level + 1))
+            lines.extend(node.to_latex())
         lines.append(r"\end{enumerate}")
         return lines
 
@@ -774,15 +908,23 @@ class UnorderedList(List):
 
 class UnorderedListItem(ListItem):
 
-    def to_latex(self, indent_level):  # For ListItem
+    def to_latex(self):  # For ListItem
         lines = []
         lines.append(r"\item")
         for node in self.children:
-            lines.extend(node.to_latex(indent_level + 1))
+            lines.extend(node.to_latex())
         return lines
 
 
 class DefinitionList(List):
+
+    def to_latex(self):
+        lines = []
+        lines.append(r"\begin{description}")
+        for node in self.children:
+            lines.extend(node.to_latex())
+        lines.append(r"\end{description}")
+        return lines
 
     def to_html(self, indent_level):
         lines = []
@@ -810,6 +952,15 @@ class DefinitionListItem(ListItem):
         self.title = title
         self.description = description
 
+    def to_latex(self):
+        lines = []
+        title = self.title.to_latex()[0]  # Assuming single line
+        lines.append(f"\\item[{title}]")
+        lines.extend(self.description.to_latex())
+        for node in self.children:
+            lines.extend(node.to_latex())
+        return lines
+
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -831,6 +982,10 @@ class DefinitionListItem(ListItem):
     
 class DefinitionListItemTitle(Text):
 
+    def to_latex(self):
+        text = self.text.replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
+        return [text]
+    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -841,6 +996,12 @@ class DefinitionListItemTitle(Text):
 
 class DefinitionListItemDescription(ListItem): # use to get contents support
 
+    def to_latex(self):
+        lines = []
+        for child in self.children:
+            lines.extend(child.to_latex())
+        return lines
+    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -861,13 +1022,13 @@ class Table(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, indent_level):  # For Table
+    def to_latex(self):  # For Table
         lines = []
         num_cols = max(len(row.children) for row in self.children if isinstance(row, TableRow))
         lines.append(r"\begin{tabular}{" + "|c" * num_cols + "|}")
         lines.append(r"\hline")
         for child in self.children:
-            lines.extend(child.to_latex(indent_level + 1))
+            lines.extend(child.to_latex())
         lines.append(r"\hline")
         lines.append(r"\end{tabular}")
         return lines
@@ -891,13 +1052,16 @@ class TableRow(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, indent_level):  # For TableRow
+    def to_latex(self):  # For TableRow
         lines = []
-        row = []
+        cells = []
         for child in self.children:
-            row.extend(child.to_latex(indent_level + 1))
-            lines.append(" & ".join(row) + r" \\")
-        return lines
+            cells.append(" ".join(child.to_latex()))
+        row = " & ".join(cells)
+        if row.strip() == "":
+            return []
+        row += r' \\'
+        return [row,]
 
     def to_html(self, indent_level):
         lines = []
@@ -917,11 +1081,11 @@ class TableCell(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, indent_level):  # For TableCell
+    def to_latex(self):  # For TableCell
         lines = []
         for child in self.children:
-            lines.extend(child.to_latex(indent_level + 1))
-            return lines if lines else [""]  # Empty cell
+            lines.extend(child.to_latex())
+        return lines
         
     def to_html(self, indent_level):
         lines = []
@@ -944,6 +1108,10 @@ class Link(Container):
         self.display_text = display_text
         self.start_pos = start_pos
         self.end_pos = end_pos
+
+    def to_latex(self):
+        display_text = self.display_text or self.target_text
+        return [f"\\href{{{self.target_text}}}{{{display_text}}}"]
 
     def to_html(self, indent_level):
         lines = []
@@ -977,19 +1145,29 @@ class InternalLink(Link):
         super().__init__(*args, **argv)
         self.target_node = None
 
-    def to_latex(self, indent_level):
+    def to_latex(self):
         lines = []
         target = self.find_target()
         if not target:
             lines.append(f"\\textit{{!!! link target \"{self.target_text}\" not found !!!}}")
             return lines
-        display_text = self.display_text or self.target_text
+
+        if len(self.children) > 0:
+            # Render child nodes (e.g., if display text contains bold, italic, etc.)
+            content = []
+            for child in self.children:
+                content.extend(child.to_latex())
+            display_text = " ".join(content)
+        else:
+            # Use display_text directly if no nested content
+            display_text = (self.display_text or self.target_text).replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
         lines.append(f"\\hyperref[obj-{target.node_id}]{{{display_text}}}")
         return lines
+    
 
     def find_target(self):
         if not self.target_node:
-            self.target_node =self.find_root().get_link_target(self.target_text)
+            self.target_node = self.find_root().get_link_target(self.target_text)
         return self.target_node
 
     def to_html(self, indent_level):
@@ -1023,13 +1201,6 @@ class InternalLink(Link):
         res['props']['target_node'] = str(target)
         return res
         
-"""
-I can't figure out how to deal with image references. They look just like
-links to regexp, unless you use the format [[file:./foo.jpg][altvalue]]
-and that doesn't work very well if you are converting to html, so I am just
-not going to support them unless I can figure out some clever way to
-tell the difference.
-"""
 class Image(Node):
     
     def __init__(self, parent, start_line, end_line, src_text, alt_text=None):
@@ -1037,6 +1208,19 @@ class Image(Node):
         self.src_text = src_text
         self.alt_text = alt_text
 
+    def to_latex(self):
+        lines = []
+        # Ensure path is correct (relative to the .tex file)
+        src = self.src_text
+        lines.append(r"\begin{figure} [ht]")
+        lines.append(r"\centering")
+        lines.append(f"\\includegraphics[width=\\textwidth]{{{src}}}")
+        if self.alt_text:
+            alt = tex_escape(self.alt_text)
+            lines.append(f"\\caption{{{alt}}}")
+        lines.append(r'\end{figure}')
+        return lines
+    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -1070,4 +1254,25 @@ def setup_tag_open(tag, indent_level, obj):
     line1 += f'class="{selector}"'
     return padding, line1
     
-    
+def tex_escape(text):
+    """
+        :param text: a plain text message
+        :return: the message escaped to appear correctly in LaTeX
+    """
+    conv = {
+        '&': r'\&',
+        '%': r'\%',
+        '$': r'\$',
+        '#': r'\#',
+        '_': r'\_',
+        '{': r'\{',
+        '}': r'\}',
+        '~': r'\textasciitilde{}',
+        '^': r'\letterhat{}', 
+        '\\': r'\textbackslash{}',
+        '<': r'\textless{}',
+        '>': r'\textgreater{}',
+    }
+    regex = re.compile('|'.join(re.escape(str(key)) for key in sorted(conv.keys(), key = lambda item: - len(item))))
+    return regex.sub(lambda match: conv[match.group()], text)
+
