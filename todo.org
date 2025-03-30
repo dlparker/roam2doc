@@ -11,6 +11,8 @@
 8. [X] Create io.py to manage input and output
 9. [X] Remember to add --enable-local-file-access to wkhtmltopdf invocation, and add it to cli.py
 10. [ ] Remove inner text from processing of <<target>> into html
+11. [ ] Document issues with latex output, such as not being able to handle links in headings
+    
 
 Possible future enhancements
 1. [ ] Allow user to supply css and javascript files on command line, to be merged into <head> by reference

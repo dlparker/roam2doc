@@ -288,7 +288,7 @@ class SectionParse(ParseTool):
         # The doc_parser may have stored zeroth section
         # properties and or title, so check for that.
         if self.doc_parser.doc_title is not None:
-            self.heading_text = f"Start of {self.doc_parser.doc_title}"
+            self.heading_text = self.doc_parser.doc_title
         else:
             self.heading_text = f"Start of {self.doc_parser.source}"
         self.level = 1

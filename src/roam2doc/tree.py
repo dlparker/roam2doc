@@ -79,6 +79,9 @@ class Root:
             lines.append(r'\usepackage{imakeidx}') 
             lines.append(r'\makeindex[intoc]') 
             lines.append(r'\usepackage{hyperref}')
+            lines.append(r'\hypersetup{')
+            lines.append(r'  colorlinks=true')
+            lines.append(r'}')
             lines.append(r'\author{' + f"{author}" + '}')
             lines.append(r'\date{\today}')
             lines.append(r'\title{' + f"{title}" + '}')
@@ -482,7 +485,7 @@ class Heading(Container):
             return self.text
         res = ""
         for child in self.children:
-            res += f" {child.get_plain_text()}"
+            res += f"{child.get_plain_text()}"
         return res
 
     def to_latex(self, part="start"):
@@ -498,7 +501,8 @@ class Heading(Container):
             title_line = []
             for child in self.children:
                 title_line.extend(child.to_latex())
-            title = " ".join(title_line).lstrip()
+            title = " ".join(title_line)
+            title = title.lstrip()
             return [title,]
         keyword = mode_dict[self.level]
         start_lines = end_lines = []
@@ -506,30 +510,29 @@ class Heading(Container):
             if keyword == "enumerate":
                 end_lines.append(r'\end{enumerate}')
             return end_lines
-        title_beginning = []
-        title_end = None
         if self.level in mode_dict:
             if keyword == "enumerate":
                 start_lines.append(r'\begin{enumerate}')
-                title_beginning.append(r'\item ')
+                start_of_title = r'\item '
             else:
-                title_beginning.append(f'\\{keyword}' + "{")
-                title_end = "}"
-        label = f"\\label{{obj-{self.node_id}}}"
+                start_of_title = f'\\{keyword}' + "{"
+                close_line = "}"
+        my_label = f" \\label{{obj-{self.node_id}}}"
+        section_label = f" \\label{{obj-{self.parent.node_id}}}"
         lines = []
-        lines.extend(start_lines)
-        title_text = []
+        title_line = []
         for child in self.children:
-            title_text.append(' '.join(child.to_latex()))
-        # now add index
-        index = r'\index{' + self.get_plain_text() + "}"
-        title_line = title_beginning
-        title_line.append(" ".join(title_text))
+            kl = ' '.join(child.to_latex())
+            title_line.append(kl.strip())
+        index = f'\\index{{{self.get_plain_text()}}}'
         title_line.append(index)
-        if title_end:
-            title_line.append(title_end)
-        title_line.append(label)
-        title = " ".join(title_line).lstrip()
+        title_line.append(my_label)
+        if close_line:
+            title_line.append(close_line)
+        title_line.append(section_label)
+        title = " ".join(title_line)
+        title = start_of_title + title.lstrip()
+
         lines.append(title)
         return lines
 
@@ -660,7 +663,7 @@ class TextTag(Container):
             return self.simple_text
         res = ""
         for child in self.children:
-            res += f" {child.get_plain_text()}"
+            res += f"{child.get_plain_text()} "
         return res
 
     def get_css_styles(self):
@@ -1118,8 +1121,10 @@ class Link(Container):
         self.end_pos = end_pos
 
     def to_latex(self):
+        target_text = tex_escape(self.target_text)
         display_text = self.display_text or self.target_text
-        return [f"\\href{{{self.target_text}}}{{{display_text}}}"]
+        display_text = tex_escape(display_text)
+        return [f"\\href{{{target_text}}}{{{display_text}}}"]
 
     def to_html(self, indent_level):
         lines = []
@@ -1176,6 +1181,9 @@ class InternalLink(Link):
     def find_target(self):
         if not self.target_node:
             self.target_node = self.find_root().get_link_target(self.target_text)
+        if self.target_node is None:
+            breakpoint()
+            print(self.__dict__)
         return self.target_node
 
     def to_html(self, indent_level):
