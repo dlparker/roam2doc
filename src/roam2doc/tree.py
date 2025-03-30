@@ -76,6 +76,8 @@ class Root:
             lines.append(r'\usepackage{amsmath}')
             lines.append(r'\usepackage{amssymb}')
             lines.append(r'\usepackage{capt-of}')
+            lines.append(r'\usepackage{imakeidx}') 
+            lines.append(r'\makeindex[intoc]') 
             lines.append(r'\usepackage{hyperref}')
             lines.append(r'\author{' + f"{author}" + '}')
             lines.append(r'\date{\today}')
@@ -84,7 +86,7 @@ class Root:
             lines.append(r'\maketitle')
             lines.append(r'\tableofcontents')
             lines.extend(self.trunk.to_latex())
-        if do_index and False:
+        if do_index:
             lines.append(r"\printindex")
         if wrap:
             lines.append(r"\end{document}")
@@ -500,26 +502,32 @@ class Heading(Container):
             return [title,]
         keyword = mode_dict[self.level]
         start_lines = end_lines = []
-        close_line = None
         if part != "start":
             if keyword == "enumerate":
                 end_lines.append(r'\end{enumerate}')
             return end_lines
-        title_line = []
+        title_beginning = []
+        title_end = None
         if self.level in mode_dict:
             if keyword == "enumerate":
                 start_lines.append(r'\begin{enumerate}')
-                title_line.append(r'\item ')
+                title_beginning.append(r'\item ')
             else:
-                title_line.append(f'\\{keyword}' + "{")
-                close_line = "}"
+                title_beginning.append(f'\\{keyword}' + "{")
+                title_end = "}"
         label = f"\\label{{obj-{self.node_id}}}"
         lines = []
         lines.extend(start_lines)
+        title_text = []
         for child in self.children:
-            title_line.append(' '.join(child.to_latex()))
-        if close_line:
-            title_line.append(close_line)
+            title_text.append(' '.join(child.to_latex()))
+        # now add index
+        index = r'\index{' + self.get_plain_text() + "}"
+        title_line = title_beginning
+        title_line.append(" ".join(title_text))
+        title_line.append(index)
+        if title_end:
+            title_line.append(title_end)
         title_line.append(label)
         title = " ".join(title_line).lstrip()
         lines.append(title)
