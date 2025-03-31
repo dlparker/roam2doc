@@ -92,9 +92,10 @@ class Root:
             lines.append(r'\begin{document}')
             lines.append(r'\maketitle')
             lines.append(r'\tableofcontents')
+            lines.extend(doc_lines)
         if do_index:
             lines.append(r"\printindex")
-        lines.extend(self.generate_cross_reference())
+        #lines.extend(self.generate_cross_reference())
         if wrap:
             lines.append(r"\end{document}")
         return "\n".join(lines)
@@ -239,12 +240,10 @@ class Branch:
                    source=self.source, nodes=[n.to_json_dict() for n in self.children]))
         return res
 
-    def to_latex(self, location=None):
+    def to_latex(self):
         lines = []
-        if location is None:
-            Location(self.node_id, None, None)
         for node in self.children:
-            lines.extend(node.to_latex(location))
+            lines.extend(node.to_latex())
         return lines
 
     def to_html(self, indent_level):
@@ -336,7 +335,7 @@ class Node:
         data['source'] = source
         return data
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         return [f"class {self.__class__.__name__} has no to_latex method",]
     
     def __str__(self):
@@ -357,7 +356,7 @@ class BlankLine(Node):
     def __init__(self, parent, start_line, end_line):
         super().__init__(parent, start_line, end_line)
     
-    def to_latex(self, parent_location):
+    def to_latex(self):
         # we don't record location, because we cannot be part of cross reference
         return [r"\vspace{\baselineskip}"]  # Adds a blank line's worth of space
         
@@ -388,7 +387,7 @@ class Container(Node):
         except ValueError:
             pass
         
-    def to_latex(self, parent_location):
+    def to_latex(self):
         return [f"class {self.__class__.__name__} has no to_latex method",]
     
     def to_html(self, indent_level):
@@ -422,16 +421,11 @@ class Section(Container):
             return
         super().add_node(node)
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         # if there is no heading, parse is broken, it is supposed to generate one
         # if the zeroth section has no heading, all other sections begin with
         # a heading by definition
-        # figure out if we are "inside" another section, which is not
-        # a concept in org files, but it important for latex section numbering
-        # and therefore for the TOC and index
-        if parent_location.last_section:
-            if self.heading.level < 
         lines.extend(self.heading.to_latex("start"))
         for node in self.children:
             if node != self.heading:
@@ -470,7 +464,7 @@ class Paragraph(Container):
     def __init__(self, parent, start, end):
         super().__init__(parent, start, end)
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         for node in self.children:
             lines.extend(node.to_latex())
@@ -513,7 +507,7 @@ class Text(Node):
     def get_plain_text(self):
         return self.text
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         # Escape special LaTeX characters
         text = tex_escape(self.text)
         return [text]
@@ -544,13 +538,13 @@ class Heading(Container):
 
     def get_plain_text(self):
         if self.text:
-            return self.text
+            return tex_escape(self.text)
         res = ""
         for child in self.children:
-            res += f"{child.get_plain_text()}"
-        return res
+            res += f" {child.get_plain_text()}"
+        return tex_escape(res)
 
-    def to_old_latex(self, part="start"):
+    def to_latex(self, part="start"):
         # headings get turned into sections so we include the latex markup
         # for that in the results
         mode_dict = {1: "section",
@@ -568,6 +562,7 @@ class Heading(Container):
             return [title,]
         keyword = mode_dict[self.level]
         start_lines = end_lines = []
+        close_line = None
         if part != "start":
             if keyword == "enumerate":
                 end_lines.append(r'\end{enumerate}')
@@ -594,60 +589,10 @@ class Heading(Container):
         title_line.append(section_label)
         title = " ".join(title_line)
         title = start_of_title + title.lstrip()
-
+        lines.extend(start_lines)
         lines.append(title)
         return lines
 
-    def get_latex_level_context(node, prev_counts=[0] * 6):
-        """Map org heading level to LaTeX-friendly section depth."""
-        level = min(node.level, 6)  # Cap for safety
-        prev_counts[level-1] += 1  # Increment this level
-        for i in range(level, 6):  # Reset deeper levels
-            prev_counts[i] = 0
-            
-        # LaTeX caps at 3 real section levels
-        if level <= 3:
-            path = [str(c) for c in prev_counts[:level] if c > 0]
-            latex_cmd = {1: "section", 2: "subsection", 3: "subsubsection"}[level]
-        else:
-            # Beyond 3, fake it with a section-like path, but render as enumerate
-            path = [str(c) for c in prev_counts[:level] if c > 0]
-            latex_cmd = "enumerate"
-    
-        location = "Section " + ".".join(path)
-        return latex_cmd, location, prev_counts.copy()
-
-    # Update Heading.to_latex
-    def to_latex(self, part="start", prev_counts=None):
-        if prev_counts is None:
-            prev_counts = [0] * 6
-        latex_cmd, location, new_counts = get_latex_level_context(self, prev_counts)
-    
-        start_lines = end_lines = []
-        if part != "start":
-            if latex_cmd == "enumerate":
-                end_lines.append(r'\end{enumerate}')
-            return end_lines
-    
-        if latex_cmd == "enumerate":
-            start_lines.append(r'\begin{enumerate}')
-            start_of_title = r'\item '
-        else:
-            start_of_title = f'\\{latex_cmd}' + "{"
-            close_line = "}"
-            
-        my_label = f" \\label{{obj-{self.node_id}}}"
-        section_label = f" \\label{{obj-{self.parent.node_id}}}"
-        lines = []
-        title_line = []
-        for child in self.children:
-            kl = ' '.join(child.to_latex())
-            title_line.append(kl.strip())
-        index = f'\\index{{{self.get_plain_text()}}}'
-        title_line.extend([index, my_label, close_line if close_line else "", section_label])
-        title = " ".join(title_line).lstrip()
-        lines.append(start_of_title + title)
-        return lines
     
     def to_html(self, indent_level):
         lines = []
@@ -693,7 +638,7 @@ class TargetText(Text):
         self.start_pos = start_pos
         self.end_pos = end_pos
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         # Escape special LaTeX characters
         line = f"\\label{{obj-{self.node_id}}}"
         return [line,]
@@ -748,7 +693,7 @@ class TextTag(Container):
         self.start_pos = start_pos
         self.end_pos = end_pos
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         latex_tag = {
             'b': 'textbf',  # BoldText
             'i': 'emph',  # ItalicText
@@ -822,7 +767,7 @@ class VerbatimText(TextTag):
     def get_css_styles(self):
         return [dict(name="font-family", value="monospace"),]
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{quote}")
         for node in self.children:
@@ -832,7 +777,7 @@ class VerbatimText(TextTag):
 
 class CenterBlock(Container):
     
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{center}")
         for node in self.children:
@@ -853,7 +798,7 @@ class QuoteBlock(Container):
             for item in content:
                 item.move_to_parent(self)
         
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{quote}")
         for node in self.children:
@@ -884,7 +829,7 @@ class CodeBlock(Text):
         return [dict(name="white-space", value="pre-wrap"),
                 dict(name="font-family", value="monospace"),]
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{verbatim}")
         lines.append(self.text)
@@ -964,7 +909,7 @@ class ListItem(Container):
     
 class OrderedList(List):
 
-    def to_latex(self, parent_location):  # For OrderedList
+    def to_latex(self):  # For OrderedList
         lines = []
         lines.append(r"\begin{enumerate}")
         for node in self.children:
@@ -987,7 +932,7 @@ class OrderedList(List):
 
 class OrderedListItem(ListItem):
 
-    def to_latex(self, parent_location):  # For ListItem
+    def to_latex(self):  # For ListItem
         lines = []
         lines.append(r"\item")
         for node in self.children:
@@ -1001,7 +946,7 @@ class OrderedListItem(ListItem):
 
 class UnorderedList(List):
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{itemize}")
         for node in self.children:
@@ -1009,7 +954,7 @@ class UnorderedList(List):
         lines.append(r"\end{itemize}")
         return lines
     
-    def to_latex(self, parent_location):  # For OrderedList
+    def to_latex(self):  # For OrderedList
         lines = []
         lines.append(r"\begin{enumerate}")
         for node in self.children:
@@ -1032,7 +977,7 @@ class UnorderedList(List):
 
 class UnorderedListItem(ListItem):
 
-    def to_latex(self, parent_location):  # For ListItem
+    def to_latex(self):  # For ListItem
         lines = []
         lines.append(r"\item")
         for node in self.children:
@@ -1042,7 +987,7 @@ class UnorderedListItem(ListItem):
 
 class DefinitionList(List):
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         lines.append(r"\begin{description}")
         for node in self.children:
@@ -1076,7 +1021,7 @@ class DefinitionListItem(ListItem):
         self.title = title
         self.description = description
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         title = self.title.to_latex()[0]  # Assuming single line
         lines.append(f"\\item[{title}]")
@@ -1106,7 +1051,7 @@ class DefinitionListItem(ListItem):
     
 class DefinitionListItemTitle(Text):
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         text = self.text.replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
         return [text]
     
@@ -1120,7 +1065,7 @@ class DefinitionListItemTitle(Text):
 
 class DefinitionListItemDescription(ListItem): # use to get contents support
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         for child in self.children:
             lines.extend(child.to_latex())
@@ -1146,7 +1091,7 @@ class Table(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, parent_location):  # For Table
+    def to_latex(self):  # For Table
         lines = []
         num_cols = max(len(row.children) for row in self.children if isinstance(row, TableRow))
         lines.append(r"\begin{tabular}{" + "|c" * num_cols + "|}")
@@ -1176,7 +1121,7 @@ class TableRow(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, parent_location):  # For TableRow
+    def to_latex(self):  # For TableRow
         lines = []
         cells = []
         for child in self.children:
@@ -1205,7 +1150,7 @@ class TableCell(Container):
         res.append(dict(name="border", value="1px solid black"))
         return res
 
-    def to_latex(self, parent_location):  # For TableCell
+    def to_latex(self):  # For TableCell
         lines = []
         for child in self.children:
             lines.extend(child.to_latex())
@@ -1233,7 +1178,7 @@ class Link(Container):
         self.start_pos = start_pos
         self.end_pos = end_pos
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         target_text = tex_escape(self.target_text)
         display_text = self.display_text or self.target_text
         display_text = tex_escape(display_text)
@@ -1271,7 +1216,7 @@ class InternalLink(Link):
         super().__init__(*args, **argv)
         self.target_node = None
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         target = self.find_target()
         if not target:
@@ -1294,9 +1239,6 @@ class InternalLink(Link):
     def find_target(self):
         if not self.target_node:
             self.target_node = self.find_root().get_link_target(self.target_text)
-        if self.target_node is None:
-            breakpoint()
-            print(self.__dict__)
         return self.target_node
 
     def to_html(self, indent_level):
@@ -1337,7 +1279,7 @@ class Image(Node):
         self.src_text = src_text
         self.alt_text = alt_text
 
-    def to_latex(self, parent_location):
+    def to_latex(self):
         lines = []
         # Ensure path is correct (relative to the .tex file)
         src = self.src_text
@@ -1490,7 +1432,7 @@ class LatexTree:
             if strings is None:
                 strings = []
             strings.append(self.location_string)
-            if self.parent
+            if self.parent:
                 return self.parent.location_strings_gen(strings, self.node.heading.level)
             else:
                 return strings
