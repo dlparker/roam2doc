@@ -16,6 +16,7 @@ class Root:
         self.trunk = None
         self.link_targets = {}
         self.css_classes = {}
+        self.grokify = False
 
     def new_node_id(self):
         self.node_id += 1
@@ -26,13 +27,17 @@ class Root:
 
     def get_link_target(self, target_id):
         if target_id in self.link_targets:
-            return self.link_targets[target_id].target_node
+            link_target = self.link_targets[target_id]
+            return {'link_target': link_target, 'node': link_target.target_node}
         if target_id.startswith('id:'):
             new_target_id = target_id[3:]
             if new_target_id in self.link_targets:
-                return self.link_targets[new_target_id].target_node
+                link_target = self.link_targets[new_target_id]
+                return {'link_target': link_target, 'node': link_target.target_node}
         # could be just a heading text
-        return self.find_heading_match(target_id)
+        heading_node = self.find_heading_match(target_id)
+        return {'link_target': None, 'node': heading_node}
+
         
     def find_heading_match(self, text, level=None):
         if not level:
@@ -59,7 +64,8 @@ class Root:
     def add_css_class(self, class_spec):
         self.css_classes[class_spec['name']] = class_spec
         
-    def to_latex(self, wrap=True, do_index=True, title=None, author=None):
+    def to_latex(self, wrap=True, do_index=True, title=None, author=None, grokify=False):
+        self.grokify = grokify
         if title is None:
             title = tex_escape(f"roam2doc parse of {self.source}")
         if author is None:
@@ -82,6 +88,7 @@ class Root:
             lines.append(r'\usepackage{capt-of}')
             lines.append(r'\usepackage{imakeidx}') 
             lines.append(r'\makeindex[intoc]') 
+            lines.append(r'\usepackage{times}')  # Use Times font
             lines.append(r'\usepackage{hyperref}')
             lines.append(r'\hypersetup{')
             lines.append(r'  colorlinks=true')
@@ -92,10 +99,11 @@ class Root:
             lines.append(r'\begin{document}')
             lines.append(r'\maketitle')
             lines.append(r'\tableofcontents')
+            lines.append(r'\clearpage')
             lines.extend(doc_lines)
         if do_index:
             lines.append(r"\printindex")
-        #lines.extend(self.generate_cross_reference())
+        lines.extend(self.generate_cross_reference())
         if wrap:
             lines.append(r"\end{document}")
         return "\n".join(lines)
@@ -137,55 +145,54 @@ class Root:
             stripped.append(line.strip())
         return "".join(lines)
 
-    # Update generate_cross_reference in Root
     def generate_cross_reference(self):
-        xref = {}
-        section_counts = [0] * 6
+        lines = []
+        lines.append(r'\noindent')
+        lines.append(r"\section*{Index}")
+        lines.append(r"\subsection*{Referenced Objects}")
+        lines.append(r"\small")
+        lines.append(r"\renewcommand{\arraystretch}{1.2}")
+        lines.append(r"\raggedright")
+        lines.append(r"\begin{tabular}{|p{3cm}|p{10cm}|}")
+        lines.append(r"\hline")
+        lines.append(r"\textbf{Referenced Object} & \textbf{Referenced by} \\")
+        lines.append(r"\hline")
+        records = []
+        for obj_id, target in self.link_targets.items():
+            refs = list(target.references)
+            if refs != []:
+                record = dict(target=target.target_node, references=refs)
+                records.append(record)
+        for record in records:
+            tnode = record['target']
+            refs = [str(ref.node_id) for ref in record['references']]
+            refs =  ",".join(refs)
+            # if in the unlikely event that I decide to re-establish the
+            # human readable xref, this is part of the pattern
+            #es = tex_escape(tnode.get_latex_label_text())
+            lines.append(f"\\hyperref[obj-{tnode.node_id}]{{{tnode.node_id}}} & {refs}  \\\\")
+        lines.append(r"\hline")
+        lines.append(r"\end{tabular}")
 
-        links_by_target_id = defaultdict(list)
-        def walk_branch_for_links(branch):
-            for node in branch.children:
-                if isinstance(node, InternalLink):
-                    target = node.find_target()
-                    if target:
-                        rec = dict(link_from_node=node, target=target)
-                        links_by_target[target].append(rec)
+        if False:
+            # if in the unlikely event that I decide to re-establish the
+            # human readable xref, this is part of the pattern
+            # Second table: Referencing Objects
+            lines.append(r"\subsection*{Referencing Objects}")
+            lines.append(r"\small")
+            lines.append(r"\renewcommand{\arraystretch}{1.2}")
+            lines.append(r"\raggedright")
+            lines.append(r"\begin{tabular}{|p{2cm}|p{12cm}|}")
+            lines.append(r"\hline")
+            lines.append(r"\textbf{Referencing Object} & \textbf{Location} \\")
+            lines.append(r"\hline")            
             
-        def walk_branch(branch, counts):
-            for node in branch.children:
-                if isinstance(node, Section) and node.heading:
-                    _, location, new_counts = get_latex_level_context(node.heading, counts)
-                    node_id = node.heading.node_id
-                    title = node.heading.get_plain_text().strip()
-                    xref[node_id] = {"title": title, "location": location, "forward": [], "backward": []}
-                
-                    breakpoint()
-                    for lt in node.heading.link_targets:
-                        target_id = lt.target_node.node_id
-                        if target_id in xref:
-                            xref[node_id]["forward"].append(xref[target_id]["title"])
-                            xref[target_id]["backward"].append(title)
-            
-                if hasattr(node, 'children'):
-                    walk_branch(node, counts.copy())
-    
-        walk_branch(self.trunk, section_counts)
-    
-        latex_lines = [
-            r"\begin{tabular}{|l|l|l|l|}",
-            r"\hline",
-            r"\textbf{Source} & \textbf{Forward Links} & \textbf{Backward Links} & \textbf{Location} \\",
-            r"\hline"
-        ]
-        for node_id, data in sorted(xref.items(), key=lambda x: x[1]["location"]):
-            source = tex_escape(data["title"])
-            forwards = ", ".join(tex_escape(t) for t in data["forward"]) or "-"
-            backwards = ", ".join(tex_escape(t) for t in data["backward"]) or "-"
-            location = data["location"]
-            latex_lines.append(f"{source} & {forwards} & {backwards} & {location} \\\\")
-            
-        latex_lines.extend([r"\hline", r"\end{tabular}"])
-        return latex_lines
+            for record in records:
+                for ref in record['references']:
+                    es = tex_escape(ref.get_latex_label_text())
+                    lines.append(f"{ref.node_id} & {es} \\\\")
+                    lines.extend([r"\hline", r"\end{tabular}"])
+        return lines
 
     def __str__(self):
         return f"root from source {self.source}"
@@ -205,7 +212,7 @@ class Branch:
             parent = root
         self.parent = parent # could be attatched to a trunk branch, not just the root
         self.node_id = root.new_node_id()
-        self.children = []
+        self.children = [] # all the children will be sections, so in effect this is self.sections
         self.last_node_id = None
         self.logger = logging.getLogger('roam2doc.tree')
 
@@ -239,6 +246,29 @@ class Branch:
                    props=dict(node_id=self.node_id,
                    source=self.source, nodes=[n.to_json_dict() for n in self.children]))
         return res
+
+    def get_parent_section(self, node):
+        if isinstance(node, Section):
+            # This is implied, not actually represented in the tree
+            # and it is really only for latex output where the
+            # heading levels are used to create nesting. The
+            # org file format does not restrict the use of stars
+            # to proper nesting, you can have as many stars as
+            # you want on a heading line without regard to the
+            # previous heading. This can create strange effects
+            # in the latex output and there is no practical
+            # solution for that.
+            caller_index = self.children.index(node)
+            search = caller_index - 1
+            while search > -1:
+                maybe = self.children[search]
+                if maybe.heading.level < node.heading.level:
+                    return maybe
+                search -= 1
+            return None
+        if isinstance(node.parent, Section):
+            return node.parent
+        return self.get_parent_section(node.parent)
 
     def to_latex(self):
         lines = []
@@ -280,6 +310,20 @@ class Node:
         if isinstance(parent, Root):
             return parent
         raise Exception("cannot find root!")
+
+    def get_grok_tag(self):
+        do = False
+        root = self.find_root()
+        if root.grokify:
+            if isinstance(self, Heading):
+                do = True
+            else:
+                for lt in root.link_targets.values():
+                    if lt.target_node == self:
+                        do = True
+        if do:
+            return f"(xref-id:{self.node_id})"
+        return None
     
     def find_branch(self):
         parent = self.parent
@@ -289,6 +333,8 @@ class Node:
             return parent
         raise Exception("cannot find branch!")
 
+    def get_latex_label_text(self):
+        return self.parent.get_latex_label_text()
             
     def add_link_target(self, target):
         self.link_targets.append(target)
@@ -421,6 +467,16 @@ class Section(Container):
             return
         super().add_node(node)
 
+    def count_by_type(self, child_type):
+        count = 0
+        for child in self.children:
+            if isinstance(child, child_type):
+                count += 1
+        return count
+    
+    def get_latex_label_text(self):
+        return tex_escape(self.heading.get_plain_text())
+    
     def to_latex(self):
         lines = []
         # if there is no heading, parse is broken, it is supposed to generate one
@@ -538,11 +594,11 @@ class Heading(Container):
 
     def get_plain_text(self):
         if self.text:
-            return tex_escape(self.text)
+            return self.text
         res = ""
         for child in self.children:
             res += f" {child.get_plain_text()}"
-        return tex_escape(res)
+        return res
 
     def to_latex(self, part="start"):
         # headings get turned into sections so we include the latex markup
@@ -581,9 +637,14 @@ class Heading(Container):
         for child in self.children:
             kl = ' '.join(child.to_latex())
             title_line.append(kl.strip())
-        index = f'\\index{{{self.get_plain_text()}}}'
+        pt = self.get_plain_text()
+        pt = tex_escape(pt)
+        index = f'\\index{{{pt}}}'
         title_line.append(index)
         title_line.append(my_label)
+        gt = self.get_grok_tag()
+        if gt:
+            title_line.append(f" {gt} ")
         if close_line:
             title_line.append(close_line)
         title_line.append(section_label)
@@ -640,7 +701,11 @@ class TargetText(Text):
 
     def to_latex(self):
         # Escape special LaTeX characters
-        line = f"\\label{{obj-{self.node_id}}}"
+
+        line = f"\\label{{obj-{self.node_id}}} "
+        gt = self.get_grok_tag()
+        if gt:
+            line += f"{tex_escape(gt)}"
         return [line,]
     
     def to_html(self, indent_level):
@@ -679,6 +744,11 @@ class LinkTarget():
         self.target_node = target_node
         self.target_text = target_text
         self.target_node.add_link_target(self)
+        self.references = []
+
+    def note_reference(self, node):
+        if node not in self.references:
+            self.references.append(node)
         
     def to_json_dict(self):
         res = dict(target_node=str(self.target_node), target_text=self.target_text)
@@ -779,6 +849,9 @@ class CenterBlock(Container):
     
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{center}")
         for node in self.children:
             lines.extend(node.to_latex())
@@ -800,6 +873,9 @@ class QuoteBlock(Container):
         
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{quote}")
         for node in self.children:
             lines.extend(node.to_latex())
@@ -831,6 +907,9 @@ class CodeBlock(Text):
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{verbatim}")
         lines.append(self.text)
         lines.append(r"\end{verbatim}")
@@ -864,6 +943,43 @@ class List(Container):
         super().__init__(parent, start_line, end_line)
         self.margin = margin
 
+    def get_latex_label_text(self):
+        section = self.find_branch().get_parent_section(self)
+        stack = self.get_list_stack()
+        top_list = stack[0]
+        lines = []
+        list_index = 0
+        if top_list == self:
+            for index, child in enumerate(section.children):
+                if child == self:
+                    break
+                if isinstance(child, List):
+                    list_index += 1
+            list_number = list_index + 1
+            last_part = f"list number {list_number}"
+        else:
+            last_part = f"sublist"
+            
+        if hasattr(self.parent, "get_latex_label_text"):
+            p_data =  self.parent.get_latex_label_text()
+            if p_data:
+                lines.append(p_data)
+        lines.append(last_part)
+        res = " > ".join(lines)
+        res.strip(" > ")
+        return res
+
+    def get_list_stack(self):
+        stack = []
+        stack.append(self)
+        if isinstance(self.parent, List):
+            stack.append(self.parent)
+            stack.extend(self.parent.get_list_stack())
+        if isinstance(self.parent, ListItem):
+            stack.extend(self.parent.parent.get_list_stack())
+        stack.reverse()
+        return stack
+        
 class ListItem(Container):
 
     def __init__(self, parent, start_line, end_line, line_contents=None):
@@ -877,6 +993,21 @@ class ListItem(Container):
         # be processed as paragraph data until the moment for parsing arrives
         self.para_lines = []
 
+    def get_latex_label_text(self):
+        parts = []
+        # find out what item number we are
+        if isinstance(self.parent, List):
+            index = self.parent.children.index(self)
+            parts.append(f"item {index + 1}")
+        if hasattr(self.parent, "get_latex_label_text"):
+            parent_part = self.parent.get_latex_label_text()
+            if parent_part:
+                parts.append(parent_part)
+        parts.reverse()
+        res = " > ".join(parts)
+        res.strip(" > ")
+        return res
+    
     def to_html(self, indent_level):
 
         add_this = """<ol>
@@ -911,13 +1042,15 @@ class OrderedList(List):
 
     def to_latex(self):  # For OrderedList
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{enumerate}")
         for node in self.children:
             lines.extend(node.to_latex())
         lines.append(r"\end{enumerate}")
         return lines
 
-    
     def to_html(self, indent_level):
         lines = []
         indent_level += 1
@@ -934,6 +1067,9 @@ class OrderedListItem(ListItem):
 
     def to_latex(self):  # For ListItem
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\item")
         for node in self.children:
             lines.extend(node.to_latex())
@@ -948,6 +1084,9 @@ class UnorderedList(List):
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{itemize}")
         for node in self.children:
             lines.extend(node.to_latex())
@@ -989,6 +1128,9 @@ class DefinitionList(List):
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         lines.append(r"\begin{description}")
         for node in self.children:
             lines.extend(node.to_latex())
@@ -1023,6 +1165,9 @@ class DefinitionListItem(ListItem):
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         title = self.title.to_latex()[0]  # Assuming single line
         lines.append(f"\\item[{title}]")
         lines.extend(self.description.to_latex())
@@ -1052,7 +1197,10 @@ class DefinitionListItem(ListItem):
 class DefinitionListItemTitle(Text):
 
     def to_latex(self):
-        text = self.text.replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
+        text = tex_escape(self)
         return [text]
     
     def to_html(self, indent_level):
@@ -1067,6 +1215,9 @@ class DefinitionListItemDescription(ListItem): # use to get contents support
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         for child in self.children:
             lines.extend(child.to_latex())
         return lines
@@ -1093,6 +1244,9 @@ class Table(Container):
 
     def to_latex(self):  # For Table
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         num_cols = max(len(row.children) for row in self.children if isinstance(row, TableRow))
         lines.append(r"\begin{tabular}{" + "|c" * num_cols + "|}")
         lines.append(r"\hline")
@@ -1232,13 +1386,18 @@ class InternalLink(Link):
         else:
             # Use display_text directly if no nested content
             display_text = (self.display_text or self.target_text).replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
+        id_string = tex_escape(f" (xref:{self.node_id})")
+        display_text += id_string
         lines.append(f"\\hyperref[obj-{target.node_id}]{{{display_text}}}")
         return lines
     
-
     def find_target(self):
         if not self.target_node:
-            self.target_node = self.find_root().get_link_target(self.target_text)
+            res = self.find_root().get_link_target(self.target_text)
+            self.target_node = res['node']
+            linker = res['link_target']
+            if linker:
+                linker.note_reference(self)
         return self.target_node
 
     def to_html(self, indent_level):
@@ -1281,6 +1440,9 @@ class Image(Node):
 
     def to_latex(self):
         lines = []
+        gt = self.get_grok_tag()
+        if gt:
+            lines.append(f" {tex_escape(gt)}")
         # Ensure path is correct (relative to the .tex file)
         src = self.src_text
         lines.append(r"\begin{figure} [ht]")
@@ -1367,38 +1529,6 @@ def get_latex_level_context(node, prev_counts=[0] * 6):
     
     location = "Section " + ".".join(path)
     return latex_cmd, location, prev_counts.copy()
-
-# Update Heading.to_latex
-def to_latex(self, part="start", prev_counts=None):
-    if prev_counts is None:
-        prev_counts = [0] * 6
-    latex_cmd, location, new_counts = get_latex_level_context(self, prev_counts)
-    
-    start_lines = end_lines = []
-    if part != "start":
-        if latex_cmd == "enumerate":
-            end_lines.append(r'\end{enumerate}')
-        return end_lines
-    
-    if latex_cmd == "enumerate":
-        start_lines.append(r'\begin{enumerate}')
-        start_of_title = r'\item '
-    else:
-        start_of_title = f'\\{latex_cmd}' + "{"
-        close_line = "}"
-    
-    my_label = f" \\label{{obj-{self.node_id}}}"
-    section_label = f" \\label{{obj-{self.parent.node_id}}}"
-    lines = []
-    title_line = []
-    for child in self.children:
-        kl = ' '.join(child.to_latex())
-        title_line.append(kl.strip())
-    index = f'\\index{{{self.get_plain_text()}}}'
-    title_line.extend([index, my_label, close_line if close_line else "", section_label])
-    title = " ".join(title_line).lstrip()
-    lines.append(start_of_title + title)
-    return lines
 
 
 class LatexTree:

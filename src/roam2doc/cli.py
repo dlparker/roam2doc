@@ -28,9 +28,12 @@ def setup_parser():
         default=None,
         help="Output file path for HTML (default: print to stdout)"
     )
+    choices = ['html', 'json', 'latex']
+    if check_for_pdflatex():
+        choices.append('pdf')
     parser.add_argument(
         "-t", "--doc_type",
-        choices=['html', 'json', 'latex'],
+        choices=choices,
         default='html',
         help="Output file path for HTML (default: html)"
     )
@@ -38,6 +41,11 @@ def setup_parser():
         "-j", "--include_json",
         action="store_true",
         help="Include a json version of the parsed document tree in the html head section",
+    )
+    parser.add_argument(
+        "-g", "--grokify",
+        action="store_true",
+        help="Produce a link cross reference table in pdf suitable for AI input",
     )
     parser.add_argument(
         "-l", "--logging",
@@ -50,7 +58,7 @@ def setup_parser():
         action="store_true",
         help="Allow overwriting existing output file (default: False)"
     )
-    res = check_for_converter()
+    res = check_for_html2pdf()
     if res:
         help = "Use wkhtmltopdf to convert output to PDF"
         if "patched" not in res:
@@ -63,7 +71,7 @@ def setup_parser():
     
     return parser
 
-def check_for_converter(): # pragma: no cover
+def check_for_html2pdf(): # pragma: no cover
     try:
         x = Popen(['wkhtmltopdf', '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError:
@@ -73,9 +81,9 @@ def check_for_converter(): # pragma: no cover
         return False
     return str(res)
     
-def convert_to_pdf(tmpf, target_path):
+def convert_html_to_pdf(tmpf, target_path):
 
-    cs = check_for_converter()
+    cs = check_for_html2pdf()
     if "patched" in cs:
         command = ['wkhtmltopdf',
                'toc',
@@ -91,6 +99,24 @@ def convert_to_pdf(tmpf, target_path):
                    tmpf,
                    str(target_path)]
     xsl_path = Path(Path(__file__).parent.resolve(), "default2.xsl")
+    x = Popen(command)
+    res,error = x.communicate()
+    
+def check_for_pdflatex(): # pragma: no cover
+    try:
+        x = Popen(['pdflatex', '-v'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        return False
+    res,error = x.communicate()
+    if error:
+        return False
+    return str(res)
+    
+def convert_latex_to_pdf(latex_path, target_path):
+
+    command = ['pdflatex', latex_path]
+    x = Popen(command)
+    res,error = x.communicate()
     x = Popen(command)
     res,error = x.communicate()
     
@@ -128,8 +154,9 @@ def process_input(args):
     # Handle output
     if args.doc_type == "html":
         output_text = root.to_html(include_json=args.include_json)
-    elif args.doc_type == "latex":
-        output_text = root.to_latex()
+    elif args.doc_type == "pdf" or args.doc_type == "latex":
+        output_text = root.to_latex(grokify=args.grokify)
+        
     elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
@@ -137,18 +164,26 @@ def process_input(args):
             tmp_path = Path(str(output_path) + ".html")
             with open(tmp_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
-            convert_to_pdf(tmp_path, output_path)
+            convert_html_to_pdf(tmp_path, output_path)
             tmp_path.unlink()
             return parsers
-        with open(output_path, 'w', encoding="utf-8") as f:
-            f.write(output_text)
-        if args.doc_type == "html":
-            logger.info(f"HTML written to {output_path}")
-        elif args.doc_type == "json":
-            logger.info(f"JSON written to {output_path}")
-    else:
+        if args.doc_type == "pdf":
+            y = list(output_path.parts)[:-1]
+            y.append(output_path.stem)
+            stem_path = Path(*y)
+            tex_path = str(stem_path) + ".tex"
+            with open(tex_path, 'w', encoding="utf-8") as f:
+                f.write(output_text)
+            convert_latex_to_pdf(tex_path, output_path)
+        if args.doc_type == "latex":
+            with open(output_path, 'w', encoding="utf-8") as f:
+                f.write(output_text)
+        logger.info(f"{args.doc_type.upper()} written to {output_path}")
+    elif args.doc_type in ['html', 'json', 'latex']:
         print(output_text)
-
+    else:
+        print(f"doc_type {args.doc_type} requires an ouput file name with --output or -o")
+        return None
     return parsers
     
 def main():

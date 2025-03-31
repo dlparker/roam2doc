@@ -90,7 +90,47 @@ def test_latex():
     branch = doc_parser.parse()
     root = branch.root
     res = root.to_latex(title="Parse of all nodes")
-    print(res)
+    trunk = root.trunk
+    section3 = trunk.children[2]
+    section2 = trunk.get_parent_section(section3)
+    assert section2 == trunk.children[1]
+    section1 = trunk.get_parent_section(section2)
+    assert section1 == trunk.children[0]
+    #print(res)
+    
+def test_latex_labels():
+    lines = []
+    lines.append('* Section 1 heading')
+    lines.append('1. List 1')
+    lines.append('    2. List 1 sub 1 <<target>>')
+    lines.append('       + List 1 sub 1 sub list item 1')
+    lines.append('       + List 1 sub 1 sub list item 2 [[target][link to target]]')
+    lines.append('       + List 1 sub 1 sub list item 3 [[target][link to target]]')
+    contents = "\n".join(lines)
+    doc_parser =  DocParser(contents, "")
+    branch = doc_parser.parse()
+    root = branch.root
+    res = root.to_latex(title="Parse of all nodes")
+    trunk = root.trunk
+    section_1 = trunk.children[0]
+    list_1 = section_1.children[0]
+    label = list_1.get_latex_label_text()
+    print(label)
+
+    
+    list_item_1 = list_1.children[0]
+    first_inner_list = list_item_1.children[1]
+    inner_list_item_1 = first_inner_list.children[0]
+    # first ones are text items
+    unordered_list = inner_list_item_1.children[-1]
+    unordered_list_item_1 = unordered_list.children[0]
+    section_check = trunk.get_parent_section(unordered_list_item_1)
+    assert section_check == section_1
+    pprint(unordered_list.get_list_stack())
+    label = unordered_list_item_1.get_latex_label_text()
+    
+
+    pprint(root.to_latex(grokify=True))
     
 
 def test_flat_ordered_list():

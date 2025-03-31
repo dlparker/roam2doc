@@ -604,7 +604,12 @@ class ListParse(ParseTool):
         # Now fix the levels
         for line_index,record in match_records.items():
             if self.spaces_per_level is not None and record['lindent'] > self.margin:
-                record['level'] = int((record['lindent'] - self.margin) / self.spaces_per_level) + 1 
+                strict = int((record['lindent'] - self.margin) / self.spaces_per_level) 
+                record['level'] = strict  + 1
+                if strict * self.spaces_per_level < record['lindent'] - self.margin:
+                    # we are going to allow improper indent, if it is greater, grant
+                    # level increase
+                    record['level'] = strict + 2
             else:
                 record['level'] = 1
         
@@ -614,8 +619,11 @@ class ListParse(ParseTool):
         match_order.sort()
         top_level_records = []
         level_lasts = {}
+        list_type = None
         for line_index in match_order:
             rec = match_records[line_index]
+            if list_type is None:
+                list_type = rec['list_type']
             level = rec['level']
             level_lasts[level] = rec
             if level == 1:
@@ -624,7 +632,8 @@ class ListParse(ParseTool):
                 parent_rec = level_lasts[level-1]
                 if 'children' not in parent_rec:
                     parent_rec['children'] = []
-                parent_rec['children'].append(rec)
+                if rec not in parent_rec['children']:
+                    parent_rec['children'].append(rec)
 
         the_list = self.do_one_level(self.parent_tree_node, top_level_records)
         if self.keyword_name:
@@ -643,8 +652,9 @@ class ListParse(ParseTool):
                           first_rec['level'], cur_list,
                           first_rec['contents'])
         first_rec['tree_list'] = cur_list
-        
-        for record in level_records:
+        list_type = first_rec['list_type']
+            
+        for index, record in enumerate(level_records):
             tree_node = self.to_tree_node(cur_list, record)
             record['tree_node'] = tree_node
             self.logger.debug("%15s @ level %d created %s from '%s'", self.short_id,
