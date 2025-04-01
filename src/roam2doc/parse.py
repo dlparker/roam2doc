@@ -3,6 +3,7 @@ import logging
 import typing
 from pathlib import Path
 from collections import defaultdict
+import subprocess
 from enum import Enum
 from pprint import pformat
 from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, BlankLine, TargetText,
@@ -1322,7 +1323,13 @@ class ToolBox:
                 else:
                     path = Path(doc_path, file_part)
                 path.resolve()
+                is_image = False
                 if path.exists():
+                    proc = subprocess.Popen(['file', str(path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    result,error = proc.communicate()
+                    if "image" in str(result):
+                        is_image = True
+                if is_image:
                     tree_item = Image(tree_node, line_index, line_index, str(path), desc)
                 else:
                     # If we can't make it into an image, just assume

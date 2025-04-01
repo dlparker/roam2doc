@@ -111,7 +111,8 @@ class Root:
             lines.extend(doc_lines)
         if do_index:
             lines.append(r"\printindex")
-        lines.extend(self.generate_cross_reference())
+        if self.grokify:
+            lines.extend(self.generate_cross_reference())
         if wrap:
             lines.append(r"\end{document}")
         return "\n".join(lines)
@@ -1109,14 +1110,6 @@ class UnorderedList(List):
         lines.append(r"\end{itemize}")
         return lines
     
-    def to_latex(self):  # For OrderedList
-        lines = []
-        lines.append(r"\begin{enumerate}")
-        for node in self.children:
-            lines.extend(node.to_latex())
-        lines.append(r"\end{enumerate}")
-        return lines
-
     
     def to_html(self, indent_level):
         lines = []
@@ -1390,7 +1383,8 @@ class InternalLink(Link):
         lines = []
         target = self.find_target()
         if not target:
-            lines.append(f"\\textit{{!!! link target \"{self.target_text}\" not found !!!}}")
+            eline = f"\\textit{{!!! link target \"{self.target_text}\" not found !!!}}"
+            lines.append(tex_escape(eline))
             return lines
 
         if len(self.children) > 0:

@@ -1,3 +1,15 @@
+* BUGZ
+1. Problems converting all_nodes.org
+   1. the last part of the type changing list in all_nodes.org has a line that ends up under the wrong parent
+   2. In the links table at the end, in latexpdf, link to list 1 doesn't link
+   3. In the links table at the end, in latexpdf, display of broken link is broken
+   4. In latexpdf, images don't work.
+   5. In latexpdf, in section 4.1.1 ordered list, the second external link does not show supplied text
+   6. In latexpdf, in section 4.1.1 ordered list, the keyword link is broken
+   7. Links are getting xref annotation even though grokify is not enabled
+
+
+
 1. [X] Make list parse handing paras in items
 2. [X] Move all regexp to matchers
 3. [X] Change all explicit Matcher instantiations to a call to tool_box
@@ -10,9 +22,8 @@
    3. Verbatim strings (=string=) cannot contain =, use ~ for that if you need it
 8. [X] Create io.py to manage input and output
 9. [X] Remember to add --enable-local-file-access to wkhtmltopdf invocation, and add it to cli.py
-10. [ ] Remove inner text from processing of <<target>> into html
-11. [ ] Document issues with latex output, such as not being able to handle links in headings
     
 
 Possible future enhancements
 1. [ ] Allow user to supply css and javascript files on command line, to be merged into <head> by reference
+   

@@ -19,7 +19,7 @@
   with minimal context and much of the available context arrises from the links between them. 
   For a look at how the cross reference and annotations work you can read grok's note to future
   sessions in [[file:examples/plain/note_from_grock.org][examples/plain/note_from_grock.org]]
-- A number of example conversions are availabile in [[file:examples/comversion][examples/comversion]]
+  
 
 * HOW to use it
 1. Until this becomes and actual package that includes an exectuable:
