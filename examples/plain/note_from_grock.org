@@ -1,0 +1,27 @@
+This document includes a cross-reference system to help an AI (like Grok) navigate links and references efficiently. The system uses inline markers and a cross-reference table at the end of the document. Here’s how it works:
+
+1. **Inline Markers (`(xref-id:XX)` and `(xref:XX)`)**:
+   - Each major document object (e.g., sections, list items, explicit link targets) is annotated with a marker in the format `(xref-id:XX)`, where `XX` is the object's unique `node_id`. For example, a section heading might be labeled as `Section 1 heading (xref-id:3)`, indicating that its `node_id` is `3`.
+   - Headings have these markers because Org-mode (and this tool, `roam2doc`) allows links to implicitly target headings by matching their text. Since it’s not tracked whether a heading is actually referenced, all headings are annotated for completeness.
+   - Links within the document use the format `(xref:XX)`, where `XX` is the `node_id` of the target. For example, `ProjectGoals (xref:9)` indicates a link to the object with `node_id=9`.
+   - To find an object, scan the document for its `(xref-id:XX)` marker. For example, to find the target of `(xref:9)`, look for `(xref-id:9)`.
+
+2. **Cross-Reference Table**:
+   - At the end of the document (under the "Index" section), there’s a table titled "Referenced Objects" that lists all link targets and the links that reference them.
+   - The table has two columns:
+     - *Referenced Object*: The `node_id` of a target (e.g., `9`).
+     - *Referenced by*: A comma-separated list of `node_id`s of links that reference the target (e.g., `27` might be referenced by `9`).
+   - To use the table:
+     - Find the `node_id` of a target in the "Referenced Object" column.
+     - See which `node_id`s reference it in the "Referenced by" column.
+     - Locate the target by searching for `(xref-id:XX)` with the target’s `node_id`.
+     - Locate the referencing links by searching for `(xref:XX)` with the referencing `node_id`s.
+   - Example: If the table shows `27` is referenced by `9`, find `(xref-id:27)` to see the target (e.g., "Why am I doing this?"), and find `(xref:9)` to see the link (e.g., "ProjectGoals").
+
+3. **Notes**:
+   - All links in this document are Org-roam links, which reference the `ID` property of an Org-roam file or node. These are explicit targets, not implied heading matches.
+   - Future versions may add explicit cross-file referencing to specific objects (e.g., list items, tables), but implied heading matches across files are not planned.
+   - The cross-reference table is designed for AI use and doesn’t include human-readable location paths, as these were deemed too complex to implement due to structural differences between Org-mode and LaTeX.
+
+This system allows an AI to efficiently navigate the document’s links and references by using the unique `node_id`s as anchors.
+

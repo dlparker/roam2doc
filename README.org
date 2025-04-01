@@ -6,10 +6,34 @@
    the converted document
 - Optionally converts the html to pdf using wkhtml2pdf.
 - Focused on the document creation aspect of org an org-roam, not on the todo lists, schedules, etc.
+- Supports custom block surrounded with keywords ~#+BEGIN_FILE_INCLUDE~ and ~#+BEGIN_FILE_INCLUDE~
+  where each line in the block is treated as a file path, either full path starting at \ or a path
+  relative to the file that contains the include block. If the path resolves then whatever it
+  contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.
+- On request, it generates a PDF that has special markup in the text and a cross reference at the end
+  of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
+  internal links in the file after it has passed through OCR. This is particularly important if you
+  are making the doc from a collection of org-roam files, as they tend to be writen as topic notes
+  with minimal context and much of the available context arrises from the links between them. 
+  For a look at how the cross reference and annotations work yuu can read grok's note to future
+  sessions in examples/plain/note_from_grock.org
+  
 
-* How to use it
+* HOW to use it
 1. Until this becomes and actual package that includes an exectuable:
-   1. PYTHONPATH=./src src/roam2doc --help 
+   1. PYTHONPATH=./src src/roam2doc --help
+1. There are two options for producing PDF, both of which require external tools
+   1. The preferred method is to use the latex to pdf tool
+      "pdflatex". This is the preferred way because it generates a decent
+      table of contents and index, and can produce special markup for AIs
+      (using the -grokify switch). The generated latex output uses various latex
+      packages, all of which are available on ubuntu like this:
+      1. sudo apt update
+      2. sudo apt install texlive-full textlive-latex-extra
+   2. Alternatively you can generate a pdf from html using wkhtmltopdf. It
+      currently does not produce and index or the cross reference for AIs,
+      but it does look nicer, at least to me. I may eventually add an index
+      (if wkhtmltopdf supports it) and the AI cross reference (that is just work)
 2. If you are producting PDF output instead of just a combined html file, then you
    will want to ensure that you have the patched QT version of wkhtml2pdf. The
    unpatched version will not handle links properly, nor produce a table of contents.
@@ -26,9 +50,32 @@
 #+BEGIN_SRC bash
    PYTHONPATH=./src src/roam2doc --help README.org -o readme.html --overwrite    
 #+END_SRC
+The full help:
+#+BEGIN_SRC bash
+usage: cli.py [-h] [-o OUTPUT] [-t {html,json,latex,pdf}] [-j] [-g] [-l {error,warning,info,debug}] [--overwrite] [--wk_pdf] input
 
+Convert org-roam files to HTML documents.
+
+positional arguments:
+  input                 Input file (.org), directory containing .org files, or file list with paths
+
+options:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output file path for HTML (default: print to stdout)
+  -t {html,json,latex,pdf}, --doc_type {html,json,latex,pdf}
+                        Output file path for HTML (default: html)
+  -j, --include_json    Include a json version of the parsed document tree in the html head section
+  -g, --grokify         Produce a link cross reference table in pdf suitable for AI input
+  -l {error,warning,info,debug}, --logging {error,warning,info,debug}
+                        Enable logging at provided level, has no effect if output goes to stdout
+  --overwrite           Allow overwriting existing output file (default: False)
+  --wk_pdf              Use wkhtmltopdf to convert output to PDF
+
+#+END_SRC
       
-* Things to know   
+* Things to know
+
 ** Things it does that might surpise you
 - Org Keyword strings are stripped from the text during parsing. The only keyword that has
   any effect is the #+NAME: keyword, which (if at line beginning) is applied to the next
@@ -64,6 +111,7 @@
   such as a PDF. So I needed a tool to do this. I prefer to look for python based solutions
   to such problems since I can modify or extend them if I need to, python being my favorite
   language.
+  
 *** The First Fix
   I found the pyorg package at [[https://github.com/nasa9084/py-org]].
   Its main purpose was to export org content to html, and I have experience using

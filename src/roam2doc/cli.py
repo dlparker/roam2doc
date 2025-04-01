@@ -85,6 +85,7 @@ def check_for_html2pdf(): # pragma: no cover
 def convert_html_to_pdf(tmpf, target_path):
 
     cs = check_for_html2pdf()
+    xsl_path = Path(Path(__file__).parent.resolve(), "default.xsl")
     if "patched" in cs:
         command = ['wkhtmltopdf',
                'toc',
@@ -99,7 +100,6 @@ def convert_html_to_pdf(tmpf, target_path):
                    '--enable-local-file-access',
                    tmpf,
                    str(target_path)]
-    xsl_path = Path(Path(__file__).parent.resolve(), "default2.xsl")
     x = Popen(command)
     res,error = x.communicate()
     
@@ -153,7 +153,7 @@ def process_input(args):
     root = parsers[0].root
 
     # Handle output
-    if args.doc_type == "html":
+    if args.doc_type == "html" or args.wk_pdf:
         output_text = root.to_html(include_json=args.include_json)
     elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict())
@@ -170,7 +170,7 @@ def process_input(args):
             convert_html_to_pdf(tmp_path, output_path)
             tmp_path.unlink()
             return parsers
-        if args.doc_type == "pdf":
+        elif args.doc_type == "pdf":
             y = list(output_path.parts)[:-1]
             y.append(output_path.stem)
             stem_path = Path(*y)

@@ -12,15 +12,12 @@
         <title>Table of Contents</title>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <style>
-          .toc-item { margin: 0.5em 0; }
-          .toc-title { display: inline-block; width: 70%; }
-          .toc-page { float: right; }
           h1 {
             text-align: center;
             font-size: 20px;
             font-family: arial;
           }
-          <!-- div {border-bottom: 1px dashed rgb(200,200,200);}-->
+          div {border-bottom: 1px dashed rgb(200,200,200);}
           span {float: right;}
           li {list-style: none;}
           ul {
