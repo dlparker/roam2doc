@@ -359,6 +359,12 @@ def test_file_all_nodes():
     doc_parser.root.to_html()
     doc_parser.root.to_html(make_pretty=False, include_json=True)
 
+def test_file_all_nodes_cli():
+    this_dir = Path(__file__).resolve().parent
+    org_file = Path(this_dir, 'org_files', 'examples', 'all_nodes.org')
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.pdf', '--doc_type', 'latex', '--grokify', '--overwrite']):
+        parsers = main()
+    
 def test_cli():
     this_dir = Path(__file__).resolve().parent
     org_file = Path(this_dir, 'org_files', 'examples', 'objects.org')

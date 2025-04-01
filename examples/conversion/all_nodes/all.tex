@@ -74,7 +74,7 @@ This continues the paragraph. This sentence ends contains a
 \emph{target}
 \label{obj-50} 
 which is not visible but can be linked. See the
-\hyperref[obj-385]{\textbf{links table} (xref:52)}
+\hyperref[obj-385]{\textbf{links table}}
 at the end of the document.  The next line (blank) will end the
 paragraph.
 
@@ -84,7 +84,7 @@ The following next two blank will also be part of the paragraph.
 They should be part of the section directly.
 
 a link
-\hyperref[obj-164]{link to last line of the definition list later in the page (xref:63)}
+\hyperref[obj-164]{link to last line of the definition list later in the page}
 
 \vspace{\baselineskip}
 This will be a third paragraph and will have no extra blank lines before the next section.
@@ -96,7 +96,7 @@ This will be a third paragraph and will have no extra blank lines before the nex
  \label{obj-72}
  \label{obj-71}
 
-\begin{enumerate}
+\begin{enumerate} \label{obj-75}
 \item
 some
 \textbf{bold}
@@ -111,18 +111,18 @@ External link
 \href{http://example.com}{http://example.com}
 \item
 External link same as above, but with display text
-\href{http://example.com}{http://example.com}
+\href{http://example.com}{same old thing}
 \item
 Internal link to something with a
 \texttt{\#+NAME:}
 keyword
-\hyperref[obj-385]{Link the links table at the end (xref:97)}
+\hyperref[obj-385]{Link the links table at the end}
 \item
 Internal link to a target
-\hyperref[obj-384]{link to target "before\_links\_table" (xref:101)}
+\hyperref[obj-384]{link to target "before\_links\_table"}
 \item
 Internal link to a heading by heading text
-\hyperref[obj-381]{End Section (xref:105)}
+\hyperref[obj-381]{End Section}
 \end{enumerate}
 \end{enumerate}
 \subsubsection{Unordered List \index{ Unordered List} }
@@ -184,7 +184,7 @@ arubop
 \label{obj-164} 
   Some text as a paragraph in an item!!! (this is child of unordered secont)
 and a link
-\hyperref[obj-15]{\textbf{\emph{back to the top!}} (xref:168)}
+\hyperref[obj-15]{\textbf{\emph{back to the top!}}}
   and an embedded table!!
 
 \begin{tabular}{|c|c|}
@@ -280,7 +280,7 @@ List 2 sub 1 sub list change type
  a  & \textbf{1 bold item} \\
  b  & \emph{2 italian items} \\
  c  & \sout{3 other items} \\
- d  & a link inside a cell! -\textgreater{} \hyperref[obj-42]{see: section 2 (xref:293)} \\
+ d  & a link inside a cell! -\textgreater{} \hyperref[obj-42]{see: section 2} \\
 \hline
 \end{tabular}
 \vspace{\baselineskip}
@@ -326,6 +326,7 @@ Yeah
 \begin{quote}
 A quote block with a cite and  a table and list inside
 
+ \label{obj-341}
 \begin{tabular}{|c|c|}
 \hline
  ww  & Checking inside quote \textbf{this item is bold} \\
@@ -361,7 +362,7 @@ export blocks make little sense after conversion
  \label{obj-360}
  \label{obj-359}
 
-\begin{enumerate}
+\begin{enumerate} \label{obj-363}
 \item
 \begin{figure} [ht]
 \centering
@@ -392,12 +393,13 @@ export blocks make little sense after conversion
  \label{obj-380}
 \label{obj-384} 
 
+ \label{obj-385}
 \begin{tabular}{|c|c|}
 \hline
- Next cell points to paragraph 1 in list 1 under section 2  & \hyperref[obj-50]{link to paragraph1 (xref:390)} \\
- Next cell points to list1 under section 2                  & \hyperref[obj-75]{link to list 1 (xref:396)} \\
- Next cell points to a heading by text reference            & \hyperref[obj-15]{link to section 1 \textbf{with some bold text!} (xref:402)} \\
- Next cell has an unresolvable link                         & \textbackslash{}textit\{!!! link target "flabist" not found !!!\} \\
+ Next cell points to paragraph 1 in list 1 under section 2  & \hyperref[obj-50]{link to paragraph1} \\
+ Next cell points to list1 under section 2                  & \hyperref[obj-75]{link to list 1} \\
+ Next cell points to a heading by text reference            & \hyperref[obj-15]{link to section 1 \textbf{with some bold text!}} \\
+ Next cell has an unresolvable link                         & \textit{!!! link target "flabist" not found !!!} \\
 \hline
 \end{tabular}
 \vspace{\baselineskip}

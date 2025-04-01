@@ -1062,7 +1062,11 @@ class OrderedList(List):
         gt = self.get_grok_tag()
         if gt:
             lines.append(f" {tex_escape(gt)}")
-        lines.append(r"\begin{enumerate}")
+        line = r"\begin{enumerate}"
+        if len(self.link_targets) > 0:
+            my_label = f" \\label{{obj-{self.node_id}}}"
+            line += my_label
+        lines.append(line)
         for node in self.children:
             lines.extend(node.to_latex())
         lines.append(r"\end{enumerate}")
@@ -1104,7 +1108,11 @@ class UnorderedList(List):
         gt = self.get_grok_tag()
         if gt:
             lines.append(f" {tex_escape(gt)}")
-        lines.append(r"\begin{itemize}")
+        line = r"\begin{itemize}"
+        if len(self.link_targets) > 0:
+            my_label = f" \\label{{obj-{self.node_id}}}"
+            line += my_label
+        lines.append(line)
         for node in self.children:
             lines.extend(node.to_latex())
         lines.append(r"\end{itemize}")
@@ -1140,7 +1148,11 @@ class DefinitionList(List):
         gt = self.get_grok_tag()
         if gt:
             lines.append(f" {tex_escape(gt)}")
-        lines.append(r"\begin{description}")
+        line = r"\begin{description}"
+        if len(self.link_targets) > 0:
+            my_label = f" \\label{{obj-{self.node_id}}}"
+            line += my_label
+        lines.append(line)
         for node in self.children:
             lines.extend(node.to_latex())
         lines.append(r"\end{description}")
@@ -1257,6 +1269,9 @@ class Table(Container):
         if gt:
             lines.append(f" {tex_escape(gt)}")
         num_cols = max(len(row.children) for row in self.children if isinstance(row, TableRow))
+        if len(self.link_targets) > 0:
+            my_label = f" \\label{{obj-{self.node_id}}}"
+            lines.append(my_label)
         lines.append(r"\begin{tabular}{" + "|c" * num_cols + "|}")
         lines.append(r"\hline")
         for child in self.children:
@@ -1343,8 +1358,13 @@ class Link(Container):
 
     def to_latex(self):
         target_text = tex_escape(self.target_text)
-        display_text = self.display_text or self.target_text
-        display_text = tex_escape(display_text)
+        display_text = ""
+        if self.display_text:
+            display_text =  tex_esscape(f'{self.display_text}')
+        elif len(self.children) > 0:
+            for child in self.children:
+                for sub in child.to_latex():
+                    display_text += sub
         return [f"\\href{{{target_text}}}{{{display_text}}}"]
 
     def to_html(self, indent_level):
@@ -1383,8 +1403,9 @@ class InternalLink(Link):
         lines = []
         target = self.find_target()
         if not target:
-            eline = f"\\textit{{!!! link target \"{self.target_text}\" not found !!!}}"
-            lines.append(tex_escape(eline))
+            e_data = tex_escape(f'!!! link target "{self.target_text}" not found !!!')
+            eline = f"\\textit{{{e_data}}}"
+            lines.append(eline)
             return lines
 
         if len(self.children) > 0:
@@ -1396,9 +1417,12 @@ class InternalLink(Link):
         else:
             # Use display_text directly if no nested content
             display_text = (self.display_text or self.target_text).replace("#", r"\#").replace("&", r"\&").replace("_", r"\_")
-        id_string = tex_escape(f" (xref:{self.node_id})")
-        display_text += id_string
+        root = self.find_root()
+        if root.grokify:
+            id_string = tex_escape(f" (xref:{self.node_id})")
+            display_text += id_string
         lines.append(f"\\hyperref[obj-{target.node_id}]{{{display_text}}}")
+            
         return lines
     
     def find_target(self):
