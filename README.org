@@ -4,10 +4,12 @@
 - Converts tree structure to html, preserving a large subset of the visual structure of
    the original files, and converting both internal and roam links into html links within
    the converted document
-- Optionally converts the html to pdf using wkhtml2pdf.
-- Focused on the document creation aspect of org an org-roam, not on the todo lists, schedules, etc.
+- Converts tree structure to latex, with with all the same features as the html version, except
+   for differences in how document structures work in the two formats.
+- Optionally converts the html to pdf using wkhtml2pdf or letex to PDF using pdflatex.
+- Focused on the document creation aspect of org and org-roam, not on the todo lists, schedules, etc.
 - Supports custom block surrounded with keywords ~#+BEGIN_FILE_INCLUDE~ and ~#+BEGIN_FILE_INCLUDE~
-  where each line in the block is treated as a file path, either full path starting at \ or a path
+  where each line in the block is treated as a file path, either full path starting at / or a path
   relative to the file that contains the include block. If the path resolves then whatever it
   contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.
 - On request, it generates a PDF that has special markup in the text and a cross reference at the end
@@ -15,8 +17,8 @@
   internal links in the file after it has passed through OCR. This is particularly important if you
   are making the doc from a collection of org-roam files, as they tend to be writen as topic notes
   with minimal context and much of the available context arrises from the links between them. 
-  For a look at how the cross reference and annotations work yuu can read grok's note to future
-  sessions in examples/plain/note_from_grock.org
+  For a look at how the cross reference and annotations work you can read grok's note to future
+  sessions in [[file:examples/plain/note_from_grock.org][examples/plain/note_from_grock.org]]
   
 
 * HOW to use it
@@ -34,13 +36,18 @@
       currently does not produce and index or the cross reference for AIs,
       but it does look nicer, at least to me. I may eventually add an index
       (if wkhtmltopdf supports it) and the AI cross reference (that is just work)
-2. If you are producting PDF output instead of just a combined html file, then you
+2. If you want to use wkhtmltopdf, then you
    will want to ensure that you have the patched QT version of wkhtml2pdf. The
    unpatched version will not handle links properly, nor produce a table of contents.
 3. See some examples in action
    1. To see the result of combining roam files:
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help examples/roam/roam_combine1.list -o roam1.html --overwrite    
+   PYTHONPATH=./src src/roam2doc --help examples/roam/roam_combine1.list -o roam1.html --overwrite --doc_type=html
+or
+   PYTHONPATH=./src src/roam2doc --help examples/roam/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
+or 
+   PYTHONPATH=./src src/roam2doc --help examples/roam/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
+ 
 #+END_SRC
    2. To see the result of parsing a large number of org content types:
 #+BEGIN_SRC bash
