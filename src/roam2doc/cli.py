@@ -10,6 +10,7 @@ from roam2doc.io import parse_fileset, parse_one_file, parse_directory, parse_fr
 from roam2doc.setup_logging import setup_logging
 
 logger = logging.getLogger('roam2doc-cli')
+            
 
 def setup_parser():
     """Set up the argument parser for the CLI."""
@@ -154,6 +155,8 @@ def process_input(args):
     # Handle output
     if args.doc_type == "html":
         output_text = root.to_html(include_json=args.include_json)
+    elif args.doc_type == "json":
+        output_text = json.dumps(root.to_json_dict())
     elif args.doc_type == "pdf" or args.doc_type == "latex":
         output_text = root.to_latex(grokify=args.grokify)
         
@@ -175,9 +178,11 @@ def process_input(args):
             with open(tex_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
             convert_latex_to_pdf(tex_path, output_path)
-        if args.doc_type == "latex":
+        elif args.doc_type in ['html', 'json', 'latex']:
             with open(output_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
+        else:
+            raise Exception(f"don't know how to do file on doc_type {args.doc_type}")
         logger.info(f"{args.doc_type.upper()} written to {output_path}")
     elif args.doc_type in ['html', 'json', 'latex']:
         print(output_text)

@@ -1,0 +1,8 @@
+* Section 1 heading and it has */some/* ~objects~ <<target>>
+:PROPERTIES:
+:ID: 000000-0000-00000001
+:END:
+a link [[id:000000-0000-00000001][link to section 1 id property]]
+a link [[target][link to section 1 first line word 'target']]
+
+

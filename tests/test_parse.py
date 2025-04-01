@@ -83,7 +83,7 @@ def test_parser_stack():
     assert len(doc_parser.parse_problems) == 0
 
 
-def test_latex():
+def test_latex_1():
     #path, contents =get_example_file_path_and_contents("min.org")
     path, contents =get_example_file_path_and_contents("all_nodes.org")
     doc_parser =  DocParser(contents, "")
@@ -91,11 +91,12 @@ def test_latex():
     root = branch.root
     res = root.to_latex(title="Parse of all nodes")
     trunk = root.trunk
-    section3 = trunk.children[2]
+    # there is zeroth section in this file
+    section3 = trunk.children[3]
     section2 = trunk.get_parent_section(section3)
-    assert section2 == trunk.children[1]
+    assert section2 == trunk.children[2]
     section1 = trunk.get_parent_section(section2)
-    assert section1 == trunk.children[0]
+    assert section1 == trunk.children[1]
     #print(res)
     
 def test_latex_labels():
@@ -128,6 +129,47 @@ def test_latex_labels():
     assert section_check == section_1
     pprint(unordered_list.get_list_stack())
     label = unordered_list_item_1.get_latex_label_text()
+    
+
+    pprint(root.to_latex(grokify=True))
+    
+def test_latex_depth():
+    lines = []
+    lines.append('* H1')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('** H2')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('*** H3')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('**** H4')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('***** H5')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('****** H6')
+    lines.append('  This document is created to improve my ability to get help from')
+    lines.append('  Grok on developing the ideas in this project. It can perform')
+    lines.append('  research for me in the way that only modern LLMs can, drastically')
+    lines.append('  the difficulty of playing "what if".')
+    lines.append('******* H7')
+    contents = "\n".join(lines)
+    doc_parser =  DocParser(contents, "")
+    branch = doc_parser.parse()
+    root = branch.root
     
 
     pprint(root.to_latex(grokify=True))
@@ -404,9 +446,6 @@ def test_roam_combine_1():
         source = sd['source']
         assert "ID style" in source and "section 2 by property" in source
         t2 = para.children[2]
-        if False:
-            print("link1=")
-            pprint(link1.get_source_data())
 
     this_dir = Path(__file__).resolve().parent
     target_dir = Path(this_dir, 'org_files', 'roam1')
@@ -414,9 +453,34 @@ def test_roam_combine_1():
     with patch('sys.argv', ['tester', str(list_file), '--output', '/tmp/foo', '--overwrite']):
         parsers = main()
     do_checks(parsers[1].branch)
+    # just to make sure --overwrite works
     with patch('sys.argv', ['tester', str(target_dir), '--output', '/tmp/foo', '--overwrite']):
         parsers = main()
     do_checks(parsers[1].branch)
+            
+def test_roam_combine_2():
+   
+    def do_checks(b2):
+        sec = b2.children[0]
+        have_three = False
+        have_two = False
+        for pos, kid in enumerate(sec.children):
+            if "file three" in ' '.join(kid.to_latex()):
+                have_three = True
+                assert not have_two, "File three found after file two, wrong order"
+            if "stuff after the include" in ' '.join(kid.to_latex()):
+                have_two = True
+                assert have_two, "File two before after file three, wrong order"
+
+    this_dir = Path(__file__).resolve().parent
+    target_dir = Path(this_dir, 'org_files', 'roam2')
+    list_file = Path(target_dir, 'roam_combine2.list')
+    with patch('sys.argv', ['tester', str(list_file), '--output', '/tmp/foo', '--overwrite']):
+        parsers = main()
+    do_checks(parsers[1].branch)
+    #  print(parsers[0].root.to_latex())
+
+    
             
 def test_objects_para():
    

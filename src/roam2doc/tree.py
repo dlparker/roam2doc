@@ -36,7 +36,12 @@ class Root:
                 return {'link_target': link_target, 'node': link_target.target_node}
         # could be just a heading text
         heading_node = self.find_heading_match(target_id)
-        return {'link_target': None, 'node': heading_node}
+        if heading_node is None:
+            return {'link_target': None, 'node': None}
+        # let's add it to the link_targets so it will show up in cross reference
+        new_target = LinkTarget(heading_node, target_id)
+        self.link_targets[target_id] = new_target
+        return {'link_target': new_target, 'node': new_target.target_node}
 
         
     def find_heading_match(self, text, level=None):
@@ -96,6 +101,9 @@ class Root:
             lines.append(r'\author{' + f"{author}" + '}')
             lines.append(r'\date{\today}')
             lines.append(r'\title{' + f"{title}" + '}')
+            lines.append(r'\setcounter{secnumdepth}{6}')
+            lines.append(r'\setlength{\parindent}{0pt}')
+            lines.append(r'\setcounter{tocdepth}{6}')
             lines.append(r'\begin{document}')
             lines.append(r'\maketitle')
             lines.append(r'\tableofcontents')
@@ -169,7 +177,6 @@ class Root:
             refs =  ",".join(refs)
             # if in the unlikely event that I decide to re-establish the
             # human readable xref, this is part of the pattern
-            #es = tex_escape(tnode.get_latex_label_text())
             lines.append(f"\\hyperref[obj-{tnode.node_id}]{{{tnode.node_id}}} & {refs}  \\\\")
         lines.append(r"\hline")
         lines.append(r"\end{tabular}")
@@ -606,16 +613,23 @@ class Heading(Container):
         mode_dict = {1: "section",
                      2: "subsection",
                      3: "subsubsection",
-                     4: "enumerate",
-                     5: "enumerate"}
+                     4: "paragraph",
+                     5: "subparagraph",
+                     6: "enumerate"}
 
         if not self.level in mode_dict:
-            title_line = []
-            for child in self.children:
-                title_line.extend(child.to_latex())
-            title = " ".join(title_line)
-            title = title.lstrip()
-            return [title,]
+            if part == "start":
+                title_line = []
+                for child in self.children:
+                    title_line.extend(child.to_latex())
+                title = " ".join(title_line)
+                title = title.lstrip()
+                title = f"\\textbf{{{title}}}\\newline"
+                return [title,]
+            else:
+                return []
+        
+        
         keyword = mode_dict[self.level]
         start_lines = end_lines = []
         close_line = None
@@ -641,17 +655,19 @@ class Heading(Container):
         pt = tex_escape(pt)
         index = f'\\index{{{pt}}}'
         title_line.append(index)
-        title_line.append(my_label)
+        #title_line.append(my_label)
         gt = self.get_grok_tag()
         if gt:
             title_line.append(f" {gt} ")
         if close_line:
             title_line.append(close_line)
-        title_line.append(section_label)
+        #title_line.append(section_label)
         title = " ".join(title_line)
         title = start_of_title + title.lstrip()
         lines.extend(start_lines)
         lines.append(title)
+        lines.append(my_label)
+        lines.append(section_label)
         return lines
 
     
@@ -1197,10 +1213,10 @@ class DefinitionListItem(ListItem):
 class DefinitionListItemTitle(Text):
 
     def to_latex(self):
+        text = tex_escape(self.text)
         gt = self.get_grok_tag()
         if gt:
-            lines.append(f" {tex_escape(gt)}")
-        text = tex_escape(self)
+            text += f" {tex_escape(gt)}"
         return [text]
     
     def to_html(self, indent_level):
@@ -1511,67 +1527,3 @@ def tex_escape(text):
 
 
 
-def get_latex_level_context(node, prev_counts=[0] * 6):
-    """Map org heading level to LaTeX-friendly section depth."""
-    level = min(node.level, 6)  # Cap for safety
-    prev_counts[level-1] += 1  # Increment this level
-    for i in range(level, 6):  # Reset deeper levels
-        prev_counts[i] = 0
-    
-    # LaTeX caps at 3 real section levels
-    if level <= 3:
-        path = [str(c) for c in prev_counts[:level] if c > 0]
-        latex_cmd = {1: "section", 2: "subsection", 3: "subsubsection"}[level]
-    else:
-        # Beyond 3, fake it with a section-like path, but render as enumerate
-        path = [str(c) for c in prev_counts[:level] if c > 0]
-        latex_cmd = "enumerate"
-    
-    location = "Section " + ".".join(path)
-    return latex_cmd, location, prev_counts.copy()
-
-
-class LatexTree:
-    """ Latex output has a different tree structure, potentially from the
-    original org file structure. Or file sections are flat, no nesting,
-    even though they begin with headings that imply nesting. However,
-    you can start an org file with a heading with three starts, implying
-    a first and second, when there isn't any. So we need to build
-    one for latext as we generate."""
-     
-    def __init__(self, node, parent_node):
-        self.node = node
-        self.parent = parent_node
-        self.location_string = None
-
-    def get_last_section_location(self, current_level=None):
-        if isinstance(self.node, Section):
-            if current_level:
-                if current_level < self.node.heading.level:
-                    return self
-                return self
-        if self.parent is None:
-            raise Exception("corrupted tree, can't find a parent section")
-        return self.parent.get_last_section_location()
-
-    def location_strings_gen(self, strings=None, level=None):
-        if self.location_string is not None:
-            return self.location_string
-        if isinstance(self.node, Section):
-            self.location_string = self.node.heading.get_level_text()
-            if strings is None:
-                strings = []
-            strings.append(self.location_string)
-            if self.parent:
-                return self.parent.location_strings_gen(strings, self.node.heading.level)
-            else:
-                return strings
-        for cls in [ListItem, Table, TableCell, Paragraph, CenterBlock, BlockQuote]:
-            if isinstance(self.node, cls):
-                # this will get better, promise
-                section = self.get_last_section_location(level)
-                return section.location_strings_gen(strings, level)
-
-        section = self.get_last_section_location(level)
-        return section.location_strings_gen(strings, level)
-        

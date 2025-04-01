@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID: 0000-1111
+:END:
+* A heading with *bold*!
+** A sub heading with */bold italiacs/* !
+ 
+* Section 2* !
+:PROPERTIES:
+:ID: 0000-2222
+:END:
+ [[target][*/bold iti/*]]
+ 
+ <<target>>

@@ -2,6 +2,7 @@
 :ID: 00000000-0000-0000-0000-000000000001
 :END:
 #+title: The File
+#+OPTIONS: broken-links:mark
 * Heading Level 1
 ** Heading Level 2
 *** Heading Level 3
@@ -12,9 +13,11 @@
 ** Section 1 subsection 1 heading and it has */some/* ~objects~
 *** level 3 section
 **** level 4 section
-***** level 5 section
-****** level 6 section
-
+***** level 5 section 
+****** level 6 section 
+******* level 7 section After level 6,
+letex will not consider it document structure, just text
+******** level 8 section 
 1. some *bold* text
 2. some /italic/ text 
 
@@ -28,7 +31,7 @@
 
 =verbatim text=
 
-This will be a <<paragraph>>.
+This will be a paragraph <<paragraph>>.
 This continues the paragraph.
 The next line (blank) will end the paragraph.
 
@@ -78,7 +81,7 @@ this other text should be in Section 2-2 after list
   + foo :: a word ofen used by programmers
   + bar :: another word ofen used by programmers
     + foobar :: see a pattern?
-    + beebop :: <<arubop>>
+    + beebop :: arubop <<arubop>>
   Some text as a paragraph in an item!!!
   and a link [[Section 1 heading][*/back to the top!/*]]
   and an embedded table!!
@@ -114,9 +117,7 @@ To fill in the bottom of the page to make the link traverse to the list more obv
 a link [[Section 1 heading][*/back to the top!/*]]
 
 **** Heading Level 4
-***** Heading Level 5
-****** Heading Level 6
-this text is in section 6
+this text is in section 4
 
        
 
@@ -238,7 +239,7 @@ quoted text with cite
   + foo :: a word ofen used by programmers
   + bar :: another word ofen used by programmers
     + foobar :: see a pattern?
-    + beebop :: <<arubop>>
+    + beebop :: arubop <<arubop>>
 
 * a section 3
 :PROPERTIES:
@@ -250,7 +251,7 @@ quoted text with cite
   - unordered sub 2 *bold text*
 - unordered second 
     + foobar :: see a pattern?
-    + beebop :: <<arubop>>
+    + beebop :: arubop <<arubop>>
   Some text as a paragraph in an item!!!
   and a link [[Section 1 heading][*/back to the top!/*]]
   and an embedded table!!

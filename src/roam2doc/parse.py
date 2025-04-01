@@ -162,7 +162,7 @@ class DocParser:
                         section.end,
                         len(self.lines))
             self.sections.append(section)
-            
+                
     def parse(self):
         self.find_sections()
         index = 0
@@ -304,7 +304,7 @@ class SectionParse(ParseTool):
         self.tree_node = Section(self.parent_tree_node, self.start, self.end)
         heading = Heading(self.tree_node, self.start, self.start, self.level, self.heading_text)
         tool_box = ToolBox(self.doc_parser)
-        objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text, pos)
+        objects = tool_box.get_text_and_object_nodes_in_line(heading, self.heading_text, pos-1)
         if self.end == self.start:
             self.logger.debug("Header %s has no following section contents", str(self))
             return self.end
