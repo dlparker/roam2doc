@@ -9,9 +9,26 @@
 - Optionally converts the html to pdf using wkhtml2pdf or letex to PDF using pdflatex.
 - Focused on the document creation aspect of org and org-roam, not on the todo lists, schedules, etc.
 - Supports custom block surrounded with keywords ~#+BEGIN_FILE_INCLUDE~ and ~#+BEGIN_FILE_INCLUDE~
-  where each line in the block is treated as a file path, either full path starting at / or a path
-  relative to the file that contains the include block. If the path resolves then whatever it
+  where each line in the block is treated as a file include spec. The first word in the line is
+  treated as a file path and any remainging words on the line are treated
+  as a line of content that should be prepended to the file's content during inclusion. The path
+  may be  either full path starting at / or a path relative to the file that contains the include block.
+  If the path resolves then whatever it
   contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.
+  The first line feature makes it
+  possible to fit the file contents into the structure of the including file, which can be helpful
+  in building a file that is essentially just and outline for including other files. Note that
+  this feature would need an upgrade if you want to use it with file names that contain spaces.
+  You can see this feature in operation when
+  [[file:examples/comversion/all_nodes/all_nodes.org][examples/conversion/all_nodes/all_nodes.org]] includes a couple
+  of files in a block that looks like this:
+#+BEGIN_SRC
+#+BEGIN_FILE_INCLUDE 
+includer1.org ** Section heading for include file, specified in include line
+includer2.org
+#+END_FILE_INCLUDE
+#+END_SRC
+  
 - On request, it generates a PDF that has special markup in the text and a cross reference at the end
   of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
   internal links in the file after it has passed through OCR. This is particularly important if you
@@ -19,7 +36,7 @@
   with minimal context and much of the available context arrises from the links between them. 
   For a look at how the cross reference and annotations work you can read grok's note to future
   sessions in [[file:examples/plain/note_from_grock.org][examples/plain/note_from_grock.org]]
-- A number of example conversions are availabile in [[file:examples/comversion][examples/comversion]]
+- A number of example conversions are availabile in [[file:examples/conversion][examples/conversion]]
 
 * HOW to use it
 1. Until this becomes and actual package that includes an exectuable:

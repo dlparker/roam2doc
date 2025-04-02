@@ -38,14 +38,20 @@ class FilesToParsers:
                 rest = content_lines[pos+1:]
                 rline = rest[rpos]
                 while not rline.upper().startswith("#+END_FILE_INCLUDE"):
-                    check_paths.append(rline.strip())
+                    first_line = None
+                    tmp = rline.strip().split()
+                    check_path = tmp[0]
+                    if len(tmp) > 1:
+                        first_line = ' '.join(tmp[1:])
+                    check_paths.append(dict(fpath=check_path, first_line=first_line))
                     rpos += 1
                     if rpos == len(rest):
                         raise Exception(f'End of file reached before include file section in {path} terminated')
                     rline = rest[rpos]
                     skip_counter += 1
                 skip_counter += 1
-                for check_path in check_paths:
+                for check_spec in check_paths:
+                    check_path = check_spec['fpath']
                     if check_path == "":
                         continue
                     if check_path.startswith('/'):
@@ -57,6 +63,8 @@ class FilesToParsers:
                     if not check_path.exists():
                         raise ValueError(f"File {path} tried to include non-existant file {check_path}")
                     include_paths.append(check_path)
+                    if check_spec['first_line']:
+                        new_lines.append(check_spec['first_line'])
                     with open(check_path, "r", encoding="utf-8") as f:
                         include_contents = f.read()
                     new_lines.extend(include_contents.split('\n'))
