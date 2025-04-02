@@ -476,7 +476,7 @@ def test_roam_combine_2():
     list_file = Path(target_dir, 'roam_combine2.list')
     with patch('sys.argv', ['tester', str(list_file), '--output', '/tmp/foo', '--overwrite']):
         parsers = main()
-    do_checks(parsers[1].branch)
+    do_checks(parsers[0].branch)
     #  print(parsers[0].root.to_latex())
 
     

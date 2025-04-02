@@ -1,11 +1,11 @@
-* Section one heading for doc two
+*** Section one heading for doc two
 
 [[id:0000-1111][ID style link to doc one at file level]]
 [[id:0000-2222][ID style link to doc one at section 2 by property drawer]]
 Some text before the target <<target2>>
 
-#+BEGIN_FILE_INCLUDE roam_combine2_part3.org
-roam_combine2_part3.org
+#+BEGIN_FILE_INCLUDE 
+roam_combine2_part3.org *** Heading set for doc 3 inclusion by include statement
 #+END_FILE_INCLUDE
 
 stuff after the include

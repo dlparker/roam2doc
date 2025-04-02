@@ -11,3 +11,8 @@
  [[target][*/bold iti/*]]
  
  <<target>>
+
+* Included file level 1
+#+BEGIN_FILE_INCLUDE 
+roam_combine2_part2.org ** Heading set by include statement
+#+END_FILE_INCLUDE
