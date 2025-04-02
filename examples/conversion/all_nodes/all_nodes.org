@@ -169,7 +169,7 @@ def foo():
 2. [[dolphin.jpg][alt_text_2]]
 
 * Include section
-#+BEGIN_FILE_INCLUDE ** Section for include file, specified in include line
+#+BEGIN_FILE_INCLUDE
 includer1.org ** Section heading for include file, specified in include line
 includer2.org
 #+END_FILE_INCLUDE
