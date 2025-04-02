@@ -103,10 +103,10 @@ def test_latex_labels():
     lines = []
     lines.append('* Section 1 heading')
     lines.append('1. List 1')
-    lines.append('    2. List 1 sub 1 <<target>>')
-    lines.append('       + List 1 sub 1 sub list item 1')
-    lines.append('       + List 1 sub 1 sub list item 2 [[target][link to target]]')
-    lines.append('       + List 1 sub 1 sub list item 3 [[target][link to target]]')
+    lines.append('  2. List 1 sub 1 <<target>>')
+    lines.append('    + List 1 sub 1 sub list item 1')
+    lines.append('    + List 1 sub 1 sub list item 2 [[target][link to target]]')
+    lines.append('    + List 1 sub 1 sub list item 3 [[target][link to target]]')
     contents = "\n".join(lines)
     doc_parser =  DocParser(contents, "")
     branch = doc_parser.parse()
@@ -118,7 +118,6 @@ def test_latex_labels():
     label = list_1.get_latex_label_text()
     print(label)
 
-    
     list_item_1 = list_1.children[0]
     first_inner_list = list_item_1.children[1]
     inner_list_item_1 = first_inner_list.children[0]
@@ -340,12 +339,23 @@ def test_file_all_nodes():
     res = doc_parser.parse()
     # make sure output is produced without blowing up
     doc_parser.root.to_html()
-    doc_parser.root.to_html(make_pretty=False, include_json=True)
+    doc_parser.root.to_html(include_json=True)
 
 def test_file_all_nodes_cli():
+    # the purpose of this is not to actually test, it
+    # is to use coverage to measure how much code the target file
+    # uses
+    
     this_dir = Path(__file__).resolve().parent
     org_file = Path(this_dir, 'org_files', 'examples', 'all_nodes.org')
-    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.pdf', '--doc_type', 'latex', '--grokify', '--overwrite']):
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.tex', '--doc_type', 'latex', '--grokify', '--overwrite']):
+        parsers = main()
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.html', '--doc_type', 'html',  '--overwrite', '--include_json']):
+        parsers = main()
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.pdf', '--doc_type', 'pdf',  '--overwrite', '--grokify']):
+        parsers = main()
+    with patch('sys.argv', ['tester', str(org_file), '--output', '/tmp/foo.pdf', '--doc_type', 'html',  '--wk_pdf',
+                            '--overwrite', '--grokify']):
         parsers = main()
     
 def test_cli():

@@ -47,6 +47,7 @@ This will be a third paragraph and will have no extra blank lines before the nex
    4. Internal link to a target  [[before_links_table][link to target "before_links_table"]]
    5. Internal link to a heading by heading text [[End Section]]
 *** Unordered List
+#+NAME: unordered_list_1
 + first uitem
 + second uitem
 + third uitem
@@ -57,6 +58,7 @@ This will be a third paragraph and will have no extra blank lines before the nex
 :PROPERTIES:
 :ID: foo_bar_section
 :END:
+#+NAME: definition_list_1
 + Joe :: a fella`
 + Joey :: a good fella
 *** List with type changing on nesting
@@ -177,5 +179,9 @@ includer2.org
 | Next cell points to paragraph 1 in list 1 under section 2 | [[paragraph1][link to paragraph1]]                              |
 | Next cell points to list1 under section 2                 | [[list_1][link to list 1]]                                      |
 | Next cell points to a heading by text reference           | [[Section 1 heading][link to section 1 *with some bold text!*]] |
-| Next cell has an unresolvable link                        | [[flabist][link to **bad thing!*]]                                                                |
+| Next cell has an unresolvable link                        | [[flabist][link to **bad thing!*]]                              |
+| Next cell links to included file by id                    | [[id:00000000-0000-0000-0000-000000000010][include_file_1]]     |
+| Next cell links to unordered list 1                       | [[unordered_list_1][link to unordered list 1]]                  |
+| Next cell links to definition list 1                      | [[definition_list_1][link to definition list 1]]                |
+
 

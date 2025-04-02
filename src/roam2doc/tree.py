@@ -117,7 +117,7 @@ class Root:
             lines.append(r"\end{document}")
         return "\n".join(lines)
 
-    def to_html(self, wrap=True, make_pretty=True, include_json=False):
+    def to_html(self, wrap=True, include_json=False):
         self.css_classes = {}
         indent_level = 0
         lines = []
@@ -147,12 +147,7 @@ class Root:
             out_lines.append("<body>")
             out_lines.extend(lines)
             lines = out_lines
-        if make_pretty:
-            return "\n".join(lines)
-        stripped = []
-        for line in lines:
-            stripped.append(line.strip())
-        return "".join(lines)
+        return "\n".join(lines)
 
     def generate_cross_reference(self):
         lines = []
@@ -182,24 +177,6 @@ class Root:
         lines.append(r"\hline")
         lines.append(r"\end{tabular}")
 
-        if False:
-            # if in the unlikely event that I decide to re-establish the
-            # human readable xref, this is part of the pattern
-            # Second table: Referencing Objects
-            lines.append(r"\subsection*{Referencing Objects}")
-            lines.append(r"\small")
-            lines.append(r"\renewcommand{\arraystretch}{1.2}")
-            lines.append(r"\raggedright")
-            lines.append(r"\begin{tabular}{|p{2cm}|p{12cm}|}")
-            lines.append(r"\hline")
-            lines.append(r"\textbf{Referencing Object} & \textbf{Location} \\")
-            lines.append(r"\hline")            
-            
-            for record in records:
-                for ref in record['references']:
-                    es = tex_escape(ref.get_latex_label_text())
-                    lines.append(f"{ref.node_id} & {es} \\\\")
-                    lines.extend([r"\hline", r"\end{tabular}"])
         return lines
 
     def __str__(self):

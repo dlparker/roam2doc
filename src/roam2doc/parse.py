@@ -608,8 +608,8 @@ class ListParse(ParseTool):
                 strict = int((record['lindent'] - self.margin) / self.spaces_per_level)
                 record['level'] = strict  + 1
                 if strict * self.spaces_per_level < record['lindent'] - self.margin:
-                    self.logger.warn("improper formatting of list at line %d of %d, moving up to previous level",
-                                     record['line_index'], len(self.doc_parser.lines))
+                    self.logger.warning("improper formatting of list at line %d of %d, moving up to previous level",
+                                        record['line_index'], len(self.doc_parser.lines))
             else:
                 record['level'] = 1
                              
