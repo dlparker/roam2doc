@@ -29,7 +29,7 @@ includer2.org
 \#+END_FILE_INCLUDE
 #+END_SRC
   
-- On request, it generates a PDF that has special markup in the text and a cross reference at the end
+- On request, it generates a PDF (only latex based option) that has special markup in the text and a cross reference at the end
   of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
   internal links in the file after it has passed through OCR. This is particularly important if you
   are making the doc from a collection of org-roam files, as they tend to be writen as topic notes
