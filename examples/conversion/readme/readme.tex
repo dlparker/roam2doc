@@ -30,7 +30,7 @@
 \section{A set of python tools for convering org-roam files to a single document \index{ A set of python tools for convering org-roam files to a single document} }
  \label{obj-3}
  \label{obj-2}
-\begin{enumerate}
+\begin{itemize}
 \item
 Can parse single or multiple org files, detecting and handling any roam links.
 \item
@@ -52,26 +52,47 @@ Focused on the document creation aspect of org and org-roam, not on the todo lis
 Supports custom block surrounded with keywords
 \texttt{\#+BEGIN\_FILE\_INCLUDE}
 \sout{BEGIN\_FILE\_INCLUDE\textasciitilde{} and \textasciitilde{}\#}
-\texttt{\#+BEGIN\_FILE\_INCLUDE}
-  where each line in the block is treated as a file path, either full path starting at / or a path
-  relative to the file that contains the include block. If the path resolves then whatever it
+\texttt{\#+END\_FILE\_INCLUDE}
+  where each line in the block is treated as a file include spec. The first word in the line is
+  treated as a file path and any remainging words on the line are treated
+  as a line of content that should be prepended to the file's content during inclusion. The path
+  may be  either full path starting at / or a path relative to the file that contains the include block.
+  If the path resolves then whatever it
   contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.
+  The first line feature makes it
+  possible to fit the file contents into the structure of the including file, which can be helpful
+  in building a file that is essentially just and outline for including other files. Note that
+  this feature would need an upgrade if you want to use it with file names that contain spaces.
+  You can see this feature in operation when
+\textit{!!! link target "file:examples/conversion/all\_nodes/all\_nodes.org" not found !!!}
+includes a couple
+  of files in a block that looks like this (github .org file processing eats the \#+BE... without the escape):
 
+\begin{verbatim}
+\#+BEGIN_FILE_INCLUDE 
+includer1.org ** Section heading for include file, specified in include line
+includer2.org
+\#+END_FILE_INCLUDE
+\end{verbatim}
+\vspace{\baselineskip}
 \item
-On request, it generates a PDF that has special markup in the text and a cross reference at the end
+On request, it generates a PDF (only latex based option) that has special markup in the text and a cross reference at the end
   of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
   internal links in the file after it has passed through OCR. This is particularly important if you
   are making the doc from a collection of org-roam files, as they tend to be writen as topic notes
   with minimal context and much of the available context arrises from the links between them. 
   For a look at how the cross reference and annotations work you can read grok's note to future
 sessions in
-\textbackslash{}textit\{!!! link target "file:examples/plain/note\_from\_grock.org" not found !!!\}
-\vspace{\baselineskip}
+\textit{!!! link target "file:examples/plain/note\_from\_grock.org" not found !!!}
 
-\end{enumerate}
+\item
+A number of example conversions are availabile in
+\textit{!!! link target "file:examples/conversion" not found !!!}
+\vspace{\baselineskip}
+\end{itemize}
 \section{HOW to use it \index{ HOW to use it} }
- \label{obj-47}
- \label{obj-46}
+ \label{obj-67}
+ \label{obj-66}
 \begin{enumerate}
 \item
 Until this becomes and actual package that includes an exectuable:
@@ -79,7 +100,7 @@ Until this becomes and actual package that includes an exectuable:
 \item
 PYTHONPATH=.
 \emph{src src}
-roam2doc --help
+roam2doc/cli.py --help
 \end{enumerate}
 \item
 There are two options for producing PDF, both of which require external tools
@@ -99,14 +120,24 @@ sudo apt install texlive-full textlive-latex-extra
 \end{enumerate}
 \item
 Alternatively you can generate a pdf from html using wkhtmltopdf. It
-      currently does not produce and index or the cross reference for AIs,
-      but it does look nicer, at least to me. I may eventually add an index
-      (if wkhtmltopdf supports it) and the AI cross reference (that is just work)
+      currently does not produce an index or the cross reference for AIs,
+      but it does look nicer, at least to me, so maybe it is better
+      for humman viewing. I may eventually add an index
+      (if I can get wkhtmltopdf to generate it) and the AI cross
+      reference (that is just work).
+      I can't figure out how to build an index manually because the page
+      breaks are created by wkhtmltopdf, and it is a fool's errand to try
+      to put page breaks in the html. The only way to do that is with
+      css, and even if you got it to work it would be broken any time
+      there was an element in a page that messed up your idea of paging.
+      Images are an example of that possibility. Or, what if the table
+      of contents wkhtmltopdf creates takes up more paged than you expect?
+      The whole idea is a freakin nightmare.
 
 \end{enumerate}
 \item
 If you want to use wkhtmltopdf, then you
-   will want to ensure that you have the patched QT version of wkhtml2pdf. The
+   will want to ensure that you have the patched QT version of wkhtmltopdf. The
    unpatched version will not handle links properly, nor produce a table of contents.
 
 \item
@@ -115,27 +146,27 @@ See some examples in action
 \item
 To see the result of combining roam files:
 \begin{verbatim}
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
 or
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
 or 
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
 
 \end{verbatim}
 \item
 To see how the include mechansim works
 \begin{verbatim}
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
+PYTHONPATH=./src src/roam2doc/cli.py  examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
 \end{verbatim}
 \item
 To see the result of parsing a large number of org content types:
 \begin{verbatim}
-PYTHONPATH=./src src/roam2doc --help examples/plain/all_nodes.org -o all.html --overwrite    
+PYTHONPATH=./src src/roam2doc/cli.py examples/conversion/all_nodes/all_nodes.org -o all.html --overwrite 
 \end{verbatim}
 \item
 To see the result of parsing this file:
 \begin{verbatim}
-PYTHONPATH=./src src/roam2doc --help README.org -o readme.html --overwrite    
+PYTHONPATH=./src src/roam2doc/cli.py README.org -o readme.html --overwrite    
 \end{verbatim}
 The full help:
 
@@ -165,24 +196,24 @@ Enable logging at provided level, has no effect if output goes to stdout
 \end{enumerate}
 \end{enumerate}
 \section{Things to know \index{ Things to know} }
- \label{obj-103}
- \label{obj-102}
+ \label{obj-133}
+ \label{obj-132}
 \vspace{\baselineskip}
 \subsection{Things it does that might surpise you \index{ Things it does that might surpise you} }
- \label{obj-107}
- \label{obj-106}
-\begin{enumerate}
+ \label{obj-137}
+ \label{obj-136}
+\begin{itemize}
 \item
 Org Keyword strings are stripped from the text during parsing. The only keyword that has
   any effect is the \#+NAME: keyword, which (if at line beginning) is applied to the next
   non-keyword line. This allows you to name an element (e.g. a table) and then link to
   it by name
 
-\end{enumerate}
+\end{itemize}
 \subsection{Things it doesn't do and probably should \index{ Things it doesn't do and probably should} }
- \label{obj-117}
- \label{obj-116}
-\begin{enumerate}
+ \label{obj-147}
+ \label{obj-146}
+\begin{itemize}
 \item
 Footnotes are not parsed, they will be treated as ordinary text
 \item
@@ -191,29 +222,32 @@ Drawers that are either property drawers at the beginning of a file or are prope
 
 \item
 Verbatim strings cannot contain equal sign "=", use \textasciitilde{} (inline code) if you need that in your text.
-\end{enumerate}
+\end{itemize}
 \subsection{Things it doesn't do and maybe never will \index{ Things it doesn't do and maybe never will} }
- \label{obj-129}
- \label{obj-128}
-\begin{enumerate}
+ \label{obj-159}
+ \label{obj-158}
+\begin{itemize}
 \item
-Parse and do something useful with the time management aspects of org files, this
+Parse and do something useful with the time management aspects of org files.
 \item
-Inlinetasks are not parsed, they will be treated as headings an will make things ugly
-\end{enumerate}
+Inlinetasks are not parsed, they will be treated as headings and will make things ugly
+\end{itemize}
 \subsection{Things it doesn't do and probably won't \index{ Things it doesn't do and probably won't} }
- \label{obj-137}
- \label{obj-136}
-\begin{enumerate}
+ \label{obj-167}
+ \label{obj-166}
+\begin{itemize}
 \item
-Run wkhtml2pdf on windows. Works on linux, will probably work on Mac
-\item
-Produce LaTex output, including any LaTex features found in the org files
-\end{enumerate}
+Run wkhtml2pdf or pdflatex on windows. Works on linux, will probably work on Mac. You can
+  product the html or latex output on Windows (probably, I haven't tried but it is pure python using only
+  standard libraries. I may have gotten sloppy with file paths somewhere, but maybe not).
+
+\end{itemize}
 \subsection{Things that might be nice to add someday \index{ Things that might be nice to add someday} }
- \label{obj-145}
- \label{obj-144}
-\begin{enumerate}
+ \label{obj-176}
+ \label{obj-175}
+\begin{itemize}
+\item
+Produce output including any LaTex features found in the org files
 \item
 Provide option to allow uset to supply css and or javascript contents to
   be merged into the head of the html output. There is already an option
@@ -221,19 +255,19 @@ Provide option to allow uset to supply css and or javascript contents to
   you could write code to inspect that object and do interesting things.
   Of course you can do this just by editing the output directly.
 
-\end{enumerate}
+\end{itemize}
 \subsection{History, what I wanted and why it lead to this. \index{ History, what I wanted and why it lead to this.} }
- \label{obj-156}
- \label{obj-155}
+ \label{obj-189}
+ \label{obj-188}
 \subsubsection{What for? \index{ What for?} }
- \label{obj-159}
- \label{obj-158}
+ \label{obj-192}
+ \label{obj-191}
   I wanted to be able to take notes on a wide range of topics and relate them together
   into a book outline. Orgroam perfectly fit my style, so I started learning it.
 
 \subsubsection{First problem \index{ First problem} }
- \label{obj-165}
- \label{obj-164}
+ \label{obj-198}
+ \label{obj-197}
   I had also just started using the Grok3 AI to work on the research I was turning into notes,
   so I wanted to be able to load all the notes into the Grok context before submitting
   prompts. Grok informed me that orgroam files would not work as well as I wanted because
@@ -244,22 +278,22 @@ Provide option to allow uset to supply css and or javascript contents to
   language.
 
 \subsubsection{The First Fix \index{ The First Fix} }
- \label{obj-177}
- \label{obj-176}
+ \label{obj-210}
+ \label{obj-209}
 I found the pyorg package at
-\href{https://github.com/nasa9084/py-org}{https://github.com/nasa9084/py-org}
+\href{https://github.com/nasa9084/py-org}{https:\emph{/github.com}nasa9084/py-org}
 .
   Its main purpose was to export org content to html, and I have experience using
   wkhtmk2pdf to create PDFs, so that seemed workable. I forked to
-\href{https://github.com/dlparker/pyorg2}{https://github.com/dlparker/pyorg2}
+\href{https://github.com/dlparker/pyorg2}{https:\emph{/github.com}dlparker/pyorg2}
 and was able to quickly modify it to add support
   for roam links.
   I got Grok to help me by updating the tests from nodetest to pytest.
   I then upgraded the tests to get 100\% coverage. Seemed like a good start
 
 \subsubsection{Now I have two problems \index{ Now I have two problems} }
- \label{obj-197}
- \label{obj-196}
+ \label{obj-230}
+ \label{obj-229}
   As I started looking at how I wanted to use this, it became clear that I also wanted to
   support org internal links, which the orignal package did not. The linking to something
   part is simple, but the range of link targets that org supports lead to some complexity
@@ -280,7 +314,7 @@ and was able to quickly modify it to add support
   The original package's parsing had some other limitations as well, which may well have
   been the author's intention to keep the task at hand to a useful limited subset of org
 format. The full format is pretty rich. See
-\href{https://orgmode.org/worg/org-syntax.html}{https://orgmode.org/worg/org-syntax.html}
+\href{https://orgmode.org/worg/org-syntax.html}{https:\emph{/orgmode.org}worg/org-syntax.html}
 
 \vspace{\baselineskip}
   The scale of the modifications needed to achieve my goals convinced me that I was going

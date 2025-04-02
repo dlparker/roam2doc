@@ -10,12 +10,12 @@
 .org-auto-LinethroughText {
    font-weight: bold !important;
 }
-.org-auto-ItalicText {
-   font-weight: bold !important;
-}
 .org-auto-CodeBlock {
    white-space: pre-wrap !important;
    font-family: monospace !important;
+}
+.org-auto-ItalicText {
+   font-weight: bold !important;
 }
   </style>
  </head>
@@ -55,115 +55,147 @@
                     <span id="obj-24" class="org-auto-Text">Supports custom block surrounded with keywords</span>
                     <code id="obj-25" class="org-auto-InlineCodeText">#+BEGIN_FILE_INCLUDE</code>
                     <s id="obj-26" class="org-auto-LinethroughText">BEGIN_FILE_INCLUDE~ and ~#</s>
-                    <code id="obj-27" class="org-auto-InlineCodeText">#+BEGIN_FILE_INCLUDE</code>
+                    <code id="obj-27" class="org-auto-InlineCodeText">#+END_FILE_INCLUDE</code>
                     <p id="obj-28" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-29" class="org-auto-Text">  where each line in the block is treated as a file path, either full path starting at / or a path</span>
-                        <span id="obj-30" class="org-auto-Text">  relative to the file that contains the include block. If the path resolves then whatever it</span>
-                        <span id="obj-31" class="org-auto-Text">  contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.</span>
+                        <span id="obj-29" class="org-auto-Text">  where each line in the block is treated as a file include spec. The first word in the line is</span>
+                        <span id="obj-30" class="org-auto-Text">  treated as a file path and any remainging words on the line are treated</span>
+                        <span id="obj-31" class="org-auto-Text">  as a line of content that should be prepended to the file's content during inclusion. The path</span>
+                        <span id="obj-32" class="org-auto-Text">  may be  either full path starting at / or a path relative to the file that contains the include block.</span>
+                        <span id="obj-33" class="org-auto-Text">  If the path resolves then whatever it</span>
+                        <span id="obj-34" class="org-auto-Text">  contains replaces the include blog. Hopefully the contents are in org mode format, or all bets are off.</span>
+                        <span id="obj-35" class="org-auto-Text">  The first line feature makes it</span>
+                        <span id="obj-36" class="org-auto-Text">  possible to fit the file contents into the structure of the including file, which can be helpful</span>
+                        <span id="obj-37" class="org-auto-Text">  in building a file that is essentially just and outline for including other files. Note that</span>
+                        <span id="obj-38" class="org-auto-Text">  this feature would need an upgrade if you want to use it with file names that contain spaces.</span>
+                        <span id="obj-39" class="org-auto-Text">  You can see this feature in operation when</span>
+                        <span id="obj-40" class="org-auto-InternalLink"style="color: red; font-style: italic; font-weight: bold;"> !!! link target "file:examples/conversion/all_nodes/all_nodes.org" not found !!!</span>
+                        <span id="obj-44" class="org-auto-Text">includes a couple</span>
+                        <span id="obj-45" class="org-auto-Text">  of files in a block that looks like this (github .org file processing eats the #+BE... without the escape):</span>
+                    </p>
+                    <code id="obj-46" class="org-auto-CodeBlock">
+\#+BEGIN_FILE_INCLUDE 
+includer1.org ** Section heading for include file, specified in include line
+includer2.org
+\#+END_FILE_INCLUDE
+                    </code>
+                    <br>
+                </li>
+                <li id="obj-48" class="org-auto-UnorderedListItem">
+                    <span id="obj-49" class="org-auto-Text">On request, it generates a PDF (only latex based option) that has special markup in the text and a cross reference at the end</span>
+                    <p id="obj-50" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-51" class="org-auto-Text">  of the generated document that is designed to enable an AI (tested with Grok3) to figure out the</span>
+                        <span id="obj-52" class="org-auto-Text">  internal links in the file after it has passed through OCR. This is particularly important if you</span>
+                        <span id="obj-53" class="org-auto-Text">  are making the doc from a collection of org-roam files, as they tend to be writen as topic notes</span>
+                        <span id="obj-54" class="org-auto-Text">  with minimal context and much of the available context arrises from the links between them. </span>
+                        <span id="obj-55" class="org-auto-Text">  For a look at how the cross reference and annotations work you can read grok's note to future</span>
+                        <span id="obj-56" class="org-auto-Text">sessions in</span>
+                        <span id="obj-57" class="org-auto-InternalLink"style="color: red; font-style: italic; font-weight: bold;"> !!! link target "file:examples/plain/note_from_grock.org" not found !!!</span>
                     </p>
                 </li>
-                <li id="obj-32" class="org-auto-UnorderedListItem">
-                    <span id="obj-33" class="org-auto-Text">On request, it generates a PDF that has special markup in the text and a cross reference at the end</span>
-                    <p id="obj-34" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-35" class="org-auto-Text">  of the generated document that is designed to enable an AI (tested with Grok3) to figure out the</span>
-                        <span id="obj-36" class="org-auto-Text">  internal links in the file after it has passed through OCR. This is particularly important if you</span>
-                        <span id="obj-37" class="org-auto-Text">  are making the doc from a collection of org-roam files, as they tend to be writen as topic notes</span>
-                        <span id="obj-38" class="org-auto-Text">  with minimal context and much of the available context arrises from the links between them. </span>
-                        <span id="obj-39" class="org-auto-Text">  For a look at how the cross reference and annotations work you can read grok's note to future</span>
-                        <span id="obj-40" class="org-auto-Text">sessions in</span>
-                        <span id="obj-41" class="org-auto-InternalLink"style="color: red; font-style: italic; font-weight: bold;"> !!! link target "file:examples/plain/note_from_grock.org" not found !!!</span>
-                        <br>
-                    </p>
+                <li id="obj-61" class="org-auto-UnorderedListItem">
+                    <span id="obj-62" class="org-auto-Text">A number of example conversions are availabile in</span>
+                    <span id="obj-63" class="org-auto-InternalLink"style="color: red; font-style: italic; font-weight: bold;"> !!! link target "file:examples/conversion" not found !!!</span>
+                    <br>
                 </li>
             </ul>
         </div>
-        <div id="obj-46" class="org-auto-Section">
-            <h1 id="obj-47" class="org-auto-Heading">
-                <span id="obj-48" class="org-auto-Text">HOW to use it</span>
+        <div id="obj-66" class="org-auto-Section">
+            <h1 id="obj-67" class="org-auto-Heading">
+                <span id="obj-68" class="org-auto-Text">HOW to use it</span>
             </h1>
-            <ol id="obj-49" class="org-auto-OrderedList">
-                <li id="obj-50" class="org-auto-OrderedListItem">
-                    <span id="obj-51" class="org-auto-Text">Until this becomes and actual package that includes an exectuable:</span>
-                    <ol id="obj-52" class="org-auto-OrderedList">
-                        <li id="obj-53" class="org-auto-OrderedListItem">
-                            <span id="obj-54" class="org-auto-Text">PYTHONPATH=.</span>
-                            <i id="obj-55" class="org-auto-ItalicText">src src</i>
-                            <span id="obj-56" class="org-auto-Text">roam2doc --help</span>
+            <ol id="obj-69" class="org-auto-OrderedList">
+                <li id="obj-70" class="org-auto-OrderedListItem">
+                    <span id="obj-71" class="org-auto-Text">Until this becomes and actual package that includes an exectuable:</span>
+                    <ol id="obj-72" class="org-auto-OrderedList">
+                        <li id="obj-73" class="org-auto-OrderedListItem">
+                            <span id="obj-74" class="org-auto-Text">PYTHONPATH=.</span>
+                            <i id="obj-75" class="org-auto-ItalicText">src src</i>
+                            <span id="obj-76" class="org-auto-Text">roam2doc/cli.py --help</span>
                         </li>
                     </ol>
                 </li>
-                <li id="obj-57" class="org-auto-OrderedListItem">
-                    <span id="obj-58" class="org-auto-Text">There are two options for producing PDF, both of which require external tools</span>
-                    <ol id="obj-59" class="org-auto-OrderedList">
-                        <li id="obj-60" class="org-auto-OrderedListItem">
-                            <span id="obj-61" class="org-auto-Text">The preferred method is to use the latex to pdf tool</span>
-                            <p id="obj-62" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                                <span id="obj-63" class="org-auto-Text">      "pdflatex". This is the preferred way because it generates a decent</span>
-                                <span id="obj-64" class="org-auto-Text">      table of contents and index, and can produce special markup for AIs</span>
-                                <span id="obj-65" class="org-auto-Text">      (using the -grokify switch). The generated latex output uses various latex</span>
-                                <span id="obj-66" class="org-auto-Text">      packages, all of which are available on ubuntu like this:</span>
+                <li id="obj-77" class="org-auto-OrderedListItem">
+                    <span id="obj-78" class="org-auto-Text">There are two options for producing PDF, both of which require external tools</span>
+                    <ol id="obj-79" class="org-auto-OrderedList">
+                        <li id="obj-80" class="org-auto-OrderedListItem">
+                            <span id="obj-81" class="org-auto-Text">The preferred method is to use the latex to pdf tool</span>
+                            <p id="obj-82" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                                <span id="obj-83" class="org-auto-Text">      "pdflatex". This is the preferred way because it generates a decent</span>
+                                <span id="obj-84" class="org-auto-Text">      table of contents and index, and can produce special markup for AIs</span>
+                                <span id="obj-85" class="org-auto-Text">      (using the -grokify switch). The generated latex output uses various latex</span>
+                                <span id="obj-86" class="org-auto-Text">      packages, all of which are available on ubuntu like this:</span>
                             </p>
-                            <ol id="obj-67" class="org-auto-OrderedList">
-                                <li id="obj-68" class="org-auto-OrderedListItem">
-                                    <span id="obj-69" class="org-auto-Text">sudo apt update</span>
+                            <ol id="obj-87" class="org-auto-OrderedList">
+                                <li id="obj-88" class="org-auto-OrderedListItem">
+                                    <span id="obj-89" class="org-auto-Text">sudo apt update</span>
                                 </li>
-                                <li id="obj-70" class="org-auto-OrderedListItem">
-                                    <span id="obj-71" class="org-auto-Text">sudo apt install texlive-full textlive-latex-extra</span>
+                                <li id="obj-90" class="org-auto-OrderedListItem">
+                                    <span id="obj-91" class="org-auto-Text">sudo apt install texlive-full textlive-latex-extra</span>
                                 </li>
                             </ol>
                         </li>
-                        <li id="obj-72" class="org-auto-OrderedListItem">
-                            <span id="obj-73" class="org-auto-Text">Alternatively you can generate a pdf from html using wkhtmltopdf. It</span>
-                            <p id="obj-74" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                                <span id="obj-75" class="org-auto-Text">      currently does not produce and index or the cross reference for AIs,</span>
-                                <span id="obj-76" class="org-auto-Text">      but it does look nicer, at least to me. I may eventually add an index</span>
-                                <span id="obj-77" class="org-auto-Text">      (if wkhtmltopdf supports it) and the AI cross reference (that is just work)</span>
+                        <li id="obj-92" class="org-auto-OrderedListItem">
+                            <span id="obj-93" class="org-auto-Text">Alternatively you can generate a pdf from html using wkhtmltopdf. It</span>
+                            <p id="obj-94" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                                <span id="obj-95" class="org-auto-Text">      currently does not produce an index or the cross reference for AIs,</span>
+                                <span id="obj-96" class="org-auto-Text">      but it does look nicer, at least to me, so maybe it is better</span>
+                                <span id="obj-97" class="org-auto-Text">      for humman viewing. I may eventually add an index</span>
+                                <span id="obj-98" class="org-auto-Text">      (if I can get wkhtmltopdf to generate it) and the AI cross</span>
+                                <span id="obj-99" class="org-auto-Text">      reference (that is just work).</span>
+                                <span id="obj-100" class="org-auto-Text">      I can't figure out how to build an index manually because the page</span>
+                                <span id="obj-101" class="org-auto-Text">      breaks are created by wkhtmltopdf, and it is a fool's errand to try</span>
+                                <span id="obj-102" class="org-auto-Text">      to put page breaks in the html. The only way to do that is with</span>
+                                <span id="obj-103" class="org-auto-Text">      css, and even if you got it to work it would be broken any time</span>
+                                <span id="obj-104" class="org-auto-Text">      there was an element in a page that messed up your idea of paging.</span>
+                                <span id="obj-105" class="org-auto-Text">      Images are an example of that possibility. Or, what if the table</span>
+                                <span id="obj-106" class="org-auto-Text">      of contents wkhtmltopdf creates takes up more paged than you expect?</span>
+                                <span id="obj-107" class="org-auto-Text">      The whole idea is a freakin nightmare.</span>
                             </p>
                         </li>
                     </ol>
                 </li>
-                <li id="obj-78" class="org-auto-OrderedListItem">
-                    <span id="obj-79" class="org-auto-Text">If you want to use wkhtmltopdf, then you</span>
-                    <p id="obj-80" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-81" class="org-auto-Text">   will want to ensure that you have the patched QT version of wkhtml2pdf. The</span>
-                        <span id="obj-82" class="org-auto-Text">   unpatched version will not handle links properly, nor produce a table of contents.</span>
+                <li id="obj-108" class="org-auto-OrderedListItem">
+                    <span id="obj-109" class="org-auto-Text">If you want to use wkhtmltopdf, then you</span>
+                    <p id="obj-110" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-111" class="org-auto-Text">   will want to ensure that you have the patched QT version of wkhtmltopdf. The</span>
+                        <span id="obj-112" class="org-auto-Text">   unpatched version will not handle links properly, nor produce a table of contents.</span>
                     </p>
                 </li>
-                <li id="obj-83" class="org-auto-OrderedListItem">
-                    <span id="obj-84" class="org-auto-Text">See some examples in action</span>
-                    <ol id="obj-85" class="org-auto-OrderedList">
-                        <li id="obj-86" class="org-auto-OrderedListItem">
-                            <span id="obj-87" class="org-auto-Text">To see the result of combining roam files:</span>
-                            <code id="obj-88" class="org-auto-CodeBlock">
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
+                <li id="obj-113" class="org-auto-OrderedListItem">
+                    <span id="obj-114" class="org-auto-Text">See some examples in action</span>
+                    <ol id="obj-115" class="org-auto-OrderedList">
+                        <li id="obj-116" class="org-auto-OrderedListItem">
+                            <span id="obj-117" class="org-auto-Text">To see the result of combining roam files:</span>
+                            <code id="obj-118" class="org-auto-CodeBlock">
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
 or
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
 or 
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
+PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
 
                             </code>
                         </li>
-                        <li id="obj-89" class="org-auto-OrderedListItem">
-                            <span id="obj-90" class="org-auto-Text">To see how the include mechansim works</span>
-                            <code id="obj-91" class="org-auto-CodeBlock">
-PYTHONPATH=./src src/roam2doc --help examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
+                        <li id="obj-119" class="org-auto-OrderedListItem">
+                            <span id="obj-120" class="org-auto-Text">To see how the include mechansim works</span>
+                            <code id="obj-121" class="org-auto-CodeBlock">
+PYTHONPATH=./src src/roam2doc/cli.py  examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
                             </code>
                         </li>
-                        <li id="obj-92" class="org-auto-OrderedListItem">
-                            <span id="obj-93" class="org-auto-Text">To see the result of parsing a large number of org content types:</span>
-                            <code id="obj-94" class="org-auto-CodeBlock">
-PYTHONPATH=./src src/roam2doc --help examples/plain/all_nodes.org -o all.html --overwrite    
+                        <li id="obj-122" class="org-auto-OrderedListItem">
+                            <span id="obj-123" class="org-auto-Text">To see the result of parsing a large number of org content types:</span>
+                            <code id="obj-124" class="org-auto-CodeBlock">
+PYTHONPATH=./src src/roam2doc/cli.py examples/conversion/all_nodes/all_nodes.org -o all.html --overwrite 
                             </code>
                         </li>
-                        <li id="obj-95" class="org-auto-OrderedListItem">
-                            <span id="obj-96" class="org-auto-Text">To see the result of parsing this file:</span>
-                            <code id="obj-97" class="org-auto-CodeBlock">
-PYTHONPATH=./src src/roam2doc --help README.org -o readme.html --overwrite    
+                        <li id="obj-125" class="org-auto-OrderedListItem">
+                            <span id="obj-126" class="org-auto-Text">To see the result of parsing this file:</span>
+                            <code id="obj-127" class="org-auto-CodeBlock">
+PYTHONPATH=./src src/roam2doc/cli.py README.org -o readme.html --overwrite    
                             </code>
-                            <p id="obj-98" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                                <span id="obj-99" class="org-auto-Text">The full help:</span>
+                            <p id="obj-128" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                                <span id="obj-129" class="org-auto-Text">The full help:</span>
                             </p>
-                            <code id="obj-100" class="org-auto-CodeBlock">
+                            <code id="obj-130" class="org-auto-CodeBlock">
 usage: cli.py [-h] [-o OUTPUT] [-t {html,json,latex,pdf}] [-j] [-g] [-l {error,warning,info,debug}] [--overwrite] [--wk_pdf] input
 
 Convert org-roam files to HTML documents.
@@ -191,146 +223,150 @@ Enable logging at provided level, has no effect if output goes to stdout
                 </li>
             </ol>
         </div>
-        <div id="obj-102" class="org-auto-Section">
-            <h1 id="obj-103" class="org-auto-Heading">
-                <span id="obj-104" class="org-auto-Text">Things to know</span>
+        <div id="obj-132" class="org-auto-Section">
+            <h1 id="obj-133" class="org-auto-Heading">
+                <span id="obj-134" class="org-auto-Text">Things to know</span>
             </h1>
             <br>
         </div>
-        <div id="obj-106" class="org-auto-Section">
-            <h2 id="obj-107" class="org-auto-Heading">
-                <span id="obj-108" class="org-auto-Text">Things it does that might surpise you</span>
-            </h2>
-            <ul id="obj-109" class="org-auto-UnorderedList">
-                <li id="obj-110" class="org-auto-UnorderedListItem">
-                    <span id="obj-111" class="org-auto-Text">Org Keyword strings are stripped from the text during parsing. The only keyword that has</span>
-                    <p id="obj-112" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-113" class="org-auto-Text">  any effect is the #+NAME: keyword, which (if at line beginning) is applied to the next</span>
-                        <span id="obj-114" class="org-auto-Text">  non-keyword line. This allows you to name an element (e.g. a table) and then link to</span>
-                        <span id="obj-115" class="org-auto-Text">  it by name</span>
-                    </p>
-                </li>
-            </ul>
-        </div>
-        <div id="obj-116" class="org-auto-Section">
-            <h2 id="obj-117" class="org-auto-Heading">
-                <span id="obj-118" class="org-auto-Text">Things it doesn't do and probably should</span>
-            </h2>
-            <ul id="obj-119" class="org-auto-UnorderedList">
-                <li id="obj-120" class="org-auto-UnorderedListItem">
-                    <span id="obj-121" class="org-auto-Text">Footnotes are not parsed, they will be treated as ordinary text</span>
-                </li>
-                <li id="obj-122" class="org-auto-UnorderedListItem">
-                    <span id="obj-123" class="org-auto-Text">Drawers that are either property drawers at the beginning of a file or are property drawers for</span>
-                    <p id="obj-124" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-125" class="org-auto-Text">  heaading are parsed, all other drawers are not parsed, just treated as text.</span>
-                    </p>
-                </li>
-                <li id="obj-126" class="org-auto-UnorderedListItem">
-                    <span id="obj-127" class="org-auto-Text">Verbatim strings cannot contain equal sign "=", use ~ (inline code) if you need that in your text.</span>
-                </li>
-            </ul>
-        </div>
-        <div id="obj-128" class="org-auto-Section">
-            <h2 id="obj-129" class="org-auto-Heading">
-                <span id="obj-130" class="org-auto-Text">Things it doesn't do and maybe never will</span>
-            </h2>
-            <ul id="obj-131" class="org-auto-UnorderedList">
-                <li id="obj-132" class="org-auto-UnorderedListItem">
-                    <span id="obj-133" class="org-auto-Text">Parse and do something useful with the time management aspects of org files, this</span>
-                </li>
-                <li id="obj-134" class="org-auto-UnorderedListItem">
-                    <span id="obj-135" class="org-auto-Text">Inlinetasks are not parsed, they will be treated as headings an will make things ugly</span>
-                </li>
-            </ul>
-        </div>
         <div id="obj-136" class="org-auto-Section">
             <h2 id="obj-137" class="org-auto-Heading">
-                <span id="obj-138" class="org-auto-Text">Things it doesn't do and probably won't</span>
+                <span id="obj-138" class="org-auto-Text">Things it does that might surpise you</span>
             </h2>
             <ul id="obj-139" class="org-auto-UnorderedList">
                 <li id="obj-140" class="org-auto-UnorderedListItem">
-                    <span id="obj-141" class="org-auto-Text">Run wkhtml2pdf on windows. Works on linux, will probably work on Mac</span>
-                </li>
-                <li id="obj-142" class="org-auto-UnorderedListItem">
-                    <span id="obj-143" class="org-auto-Text">Produce LaTex output, including any LaTex features found in the org files</span>
-                </li>
-            </ul>
-        </div>
-        <div id="obj-144" class="org-auto-Section">
-            <h2 id="obj-145" class="org-auto-Heading">
-                <span id="obj-146" class="org-auto-Text">Things that might be nice to add someday</span>
-            </h2>
-            <ul id="obj-147" class="org-auto-UnorderedList">
-                <li id="obj-148" class="org-auto-UnorderedListItem">
-                    <span id="obj-149" class="org-auto-Text">Provide option to allow uset to supply css and or javascript contents to</span>
-                    <p id="obj-150" class="org-auto-Paragraph" style="margin-top: 0 !important" >
-                        <span id="obj-151" class="org-auto-Text">  be merged into the head of the html output. There is already an option</span>
-                        <span id="obj-152" class="org-auto-Text">  to include a json object version of the parsed tree into the head, so</span>
-                        <span id="obj-153" class="org-auto-Text">  you could write code to inspect that object and do interesting things.</span>
-                        <span id="obj-154" class="org-auto-Text">  Of course you can do this just by editing the output directly.</span>
+                    <span id="obj-141" class="org-auto-Text">Org Keyword strings are stripped from the text during parsing. The only keyword that has</span>
+                    <p id="obj-142" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-143" class="org-auto-Text">  any effect is the #+NAME: keyword, which (if at line beginning) is applied to the next</span>
+                        <span id="obj-144" class="org-auto-Text">  non-keyword line. This allows you to name an element (e.g. a table) and then link to</span>
+                        <span id="obj-145" class="org-auto-Text">  it by name</span>
                     </p>
                 </li>
             </ul>
         </div>
-        <div id="obj-155" class="org-auto-Section">
-            <h2 id="obj-156" class="org-auto-Heading">
-                <span id="obj-157" class="org-auto-Text">History, what I wanted and why it lead to this.</span>
+        <div id="obj-146" class="org-auto-Section">
+            <h2 id="obj-147" class="org-auto-Heading">
+                <span id="obj-148" class="org-auto-Text">Things it doesn't do and probably should</span>
             </h2>
+            <ul id="obj-149" class="org-auto-UnorderedList">
+                <li id="obj-150" class="org-auto-UnorderedListItem">
+                    <span id="obj-151" class="org-auto-Text">Footnotes are not parsed, they will be treated as ordinary text</span>
+                </li>
+                <li id="obj-152" class="org-auto-UnorderedListItem">
+                    <span id="obj-153" class="org-auto-Text">Drawers that are either property drawers at the beginning of a file or are property drawers for</span>
+                    <p id="obj-154" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-155" class="org-auto-Text">  heaading are parsed, all other drawers are not parsed, just treated as text.</span>
+                    </p>
+                </li>
+                <li id="obj-156" class="org-auto-UnorderedListItem">
+                    <span id="obj-157" class="org-auto-Text">Verbatim strings cannot contain equal sign "=", use ~ (inline code) if you need that in your text.</span>
+                </li>
+            </ul>
         </div>
         <div id="obj-158" class="org-auto-Section">
-            <h3 id="obj-159" class="org-auto-Heading">
-                <span id="obj-160" class="org-auto-Text">What for?</span>
+            <h2 id="obj-159" class="org-auto-Heading">
+                <span id="obj-160" class="org-auto-Text">Things it doesn't do and maybe never will</span>
+            </h2>
+            <ul id="obj-161" class="org-auto-UnorderedList">
+                <li id="obj-162" class="org-auto-UnorderedListItem">
+                    <span id="obj-163" class="org-auto-Text">Parse and do something useful with the time management aspects of org files.</span>
+                </li>
+                <li id="obj-164" class="org-auto-UnorderedListItem">
+                    <span id="obj-165" class="org-auto-Text">Inlinetasks are not parsed, they will be treated as headings and will make things ugly</span>
+                </li>
+            </ul>
+        </div>
+        <div id="obj-166" class="org-auto-Section">
+            <h2 id="obj-167" class="org-auto-Heading">
+                <span id="obj-168" class="org-auto-Text">Things it doesn't do and probably won't</span>
+            </h2>
+            <ul id="obj-169" class="org-auto-UnorderedList">
+                <li id="obj-170" class="org-auto-UnorderedListItem">
+                    <span id="obj-171" class="org-auto-Text">Run wkhtml2pdf or pdflatex on windows. Works on linux, will probably work on Mac. You can</span>
+                    <p id="obj-172" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-173" class="org-auto-Text">  product the html or latex output on Windows (probably, I haven't tried but it is pure python using only</span>
+                        <span id="obj-174" class="org-auto-Text">  standard libraries. I may have gotten sloppy with file paths somewhere, but maybe not).</span>
+                    </p>
+                </li>
+            </ul>
+        </div>
+        <div id="obj-175" class="org-auto-Section">
+            <h2 id="obj-176" class="org-auto-Heading">
+                <span id="obj-177" class="org-auto-Text">Things that might be nice to add someday</span>
+            </h2>
+            <ul id="obj-178" class="org-auto-UnorderedList">
+                <li id="obj-179" class="org-auto-UnorderedListItem">
+                    <span id="obj-180" class="org-auto-Text">Produce output including any LaTex features found in the org files</span>
+                </li>
+                <li id="obj-181" class="org-auto-UnorderedListItem">
+                    <span id="obj-182" class="org-auto-Text">Provide option to allow uset to supply css and or javascript contents to</span>
+                    <p id="obj-183" class="org-auto-Paragraph" style="margin-top: 0 !important" >
+                        <span id="obj-184" class="org-auto-Text">  be merged into the head of the html output. There is already an option</span>
+                        <span id="obj-185" class="org-auto-Text">  to include a json object version of the parsed tree into the head, so</span>
+                        <span id="obj-186" class="org-auto-Text">  you could write code to inspect that object and do interesting things.</span>
+                        <span id="obj-187" class="org-auto-Text">  Of course you can do this just by editing the output directly.</span>
+                    </p>
+                </li>
+            </ul>
+        </div>
+        <div id="obj-188" class="org-auto-Section">
+            <h2 id="obj-189" class="org-auto-Heading">
+                <span id="obj-190" class="org-auto-Text">History, what I wanted and why it lead to this.</span>
+            </h2>
+        </div>
+        <div id="obj-191" class="org-auto-Section">
+            <h3 id="obj-192" class="org-auto-Heading">
+                <span id="obj-193" class="org-auto-Text">What for?</span>
             </h3>
-            <p id="obj-161" class="org-auto-Paragraph">
-                <span id="obj-162" class="org-auto-Text">  I wanted to be able to take notes on a wide range of topics and relate them together</span>
-                <span id="obj-163" class="org-auto-Text">  into a book outline. Orgroam perfectly fit my style, so I started learning it.</span>
+            <p id="obj-194" class="org-auto-Paragraph">
+                <span id="obj-195" class="org-auto-Text">  I wanted to be able to take notes on a wide range of topics and relate them together</span>
+                <span id="obj-196" class="org-auto-Text">  into a book outline. Orgroam perfectly fit my style, so I started learning it.</span>
             </p>
         </div>
-        <div id="obj-164" class="org-auto-Section">
-            <h3 id="obj-165" class="org-auto-Heading">
-                <span id="obj-166" class="org-auto-Text">First problem</span>
+        <div id="obj-197" class="org-auto-Section">
+            <h3 id="obj-198" class="org-auto-Heading">
+                <span id="obj-199" class="org-auto-Text">First problem</span>
             </h3>
-            <p id="obj-167" class="org-auto-Paragraph">
-                <span id="obj-168" class="org-auto-Text">  I had also just started using the Grok3 AI to work on the research I was turning into notes,</span>
-                <span id="obj-169" class="org-auto-Text">  so I wanted to be able to load all the notes into the Grok context before submitting</span>
-                <span id="obj-170" class="org-auto-Text">  prompts. Grok informed me that orgroam files would not work as well as I wanted because</span>
-                <span id="obj-171" class="org-auto-Text">  it wouldn't do well interpreting the org files, and especially the links. Grok suggested</span>
-                <span id="obj-172" class="org-auto-Text">  that I would get much better results if I could collect the files into single document</span>
-                <span id="obj-173" class="org-auto-Text">  such as a PDF. So I needed a tool to do this. I prefer to look for python based solutions</span>
-                <span id="obj-174" class="org-auto-Text">  to such problems since I can modify or extend them if I need to, python being my favorite</span>
-                <span id="obj-175" class="org-auto-Text">  language.</span>
+            <p id="obj-200" class="org-auto-Paragraph">
+                <span id="obj-201" class="org-auto-Text">  I had also just started using the Grok3 AI to work on the research I was turning into notes,</span>
+                <span id="obj-202" class="org-auto-Text">  so I wanted to be able to load all the notes into the Grok context before submitting</span>
+                <span id="obj-203" class="org-auto-Text">  prompts. Grok informed me that orgroam files would not work as well as I wanted because</span>
+                <span id="obj-204" class="org-auto-Text">  it wouldn't do well interpreting the org files, and especially the links. Grok suggested</span>
+                <span id="obj-205" class="org-auto-Text">  that I would get much better results if I could collect the files into single document</span>
+                <span id="obj-206" class="org-auto-Text">  such as a PDF. So I needed a tool to do this. I prefer to look for python based solutions</span>
+                <span id="obj-207" class="org-auto-Text">  to such problems since I can modify or extend them if I need to, python being my favorite</span>
+                <span id="obj-208" class="org-auto-Text">  language.</span>
             </p>
         </div>
-        <div id="obj-176" class="org-auto-Section">
-            <h3 id="obj-177" class="org-auto-Heading">
-                <span id="obj-178" class="org-auto-Text">The First Fix</span>
+        <div id="obj-209" class="org-auto-Section">
+            <h3 id="obj-210" class="org-auto-Heading">
+                <span id="obj-211" class="org-auto-Text">The First Fix</span>
             </h3>
-            <p id="obj-179" class="org-auto-Paragraph">
-                <span id="obj-180" class="org-auto-Text">I found the pyorg package at</span>
-                <a id="obj-181" class="org-auto-Link" href="https://github.com/nasa9084/py-org">    <span id="obj-182" class="org-auto-Text">https:</span>    <i id="obj-183" class="org-auto-ItalicText">/github.com</i>    <span id="obj-184" class="org-auto-Text">nasa9084/py-org</span></a>
-                <span id="obj-185" class="org-auto-Text">.</span>
-                <span id="obj-186" class="org-auto-Text">  Its main purpose was to export org content to html, and I have experience using</span>
-                <span id="obj-187" class="org-auto-Text">  wkhtmk2pdf to create PDFs, so that seemed workable. I forked to</span>
-                <a id="obj-188" class="org-auto-Link" href="https://github.com/dlparker/pyorg2">    <span id="obj-189" class="org-auto-Text">https:</span>    <i id="obj-190" class="org-auto-ItalicText">/github.com</i>    <span id="obj-191" class="org-auto-Text">dlparker/pyorg2</span></a>
-                <span id="obj-192" class="org-auto-Text">and was able to quickly modify it to add support</span>
-                <span id="obj-193" class="org-auto-Text">  for roam links.</span>
-                <span id="obj-194" class="org-auto-Text">  I got Grok to help me by updating the tests from nodetest to pytest.</span>
-                <span id="obj-195" class="org-auto-Text">  I then upgraded the tests to get 100% coverage. Seemed like a good start</span>
+            <p id="obj-212" class="org-auto-Paragraph">
+                <span id="obj-213" class="org-auto-Text">I found the pyorg package at</span>
+                <a id="obj-214" class="org-auto-Link" href="https://github.com/nasa9084/py-org">    <span id="obj-215" class="org-auto-Text">https:</span>    <i id="obj-216" class="org-auto-ItalicText">/github.com</i>    <span id="obj-217" class="org-auto-Text">nasa9084/py-org</span></a>
+                <span id="obj-218" class="org-auto-Text">.</span>
+                <span id="obj-219" class="org-auto-Text">  Its main purpose was to export org content to html, and I have experience using</span>
+                <span id="obj-220" class="org-auto-Text">  wkhtmk2pdf to create PDFs, so that seemed workable. I forked to</span>
+                <a id="obj-221" class="org-auto-Link" href="https://github.com/dlparker/pyorg2">    <span id="obj-222" class="org-auto-Text">https:</span>    <i id="obj-223" class="org-auto-ItalicText">/github.com</i>    <span id="obj-224" class="org-auto-Text">dlparker/pyorg2</span></a>
+                <span id="obj-225" class="org-auto-Text">and was able to quickly modify it to add support</span>
+                <span id="obj-226" class="org-auto-Text">  for roam links.</span>
+                <span id="obj-227" class="org-auto-Text">  I got Grok to help me by updating the tests from nodetest to pytest.</span>
+                <span id="obj-228" class="org-auto-Text">  I then upgraded the tests to get 100% coverage. Seemed like a good start</span>
             </p>
         </div>
-        <div id="obj-196" class="org-auto-Section">
-            <h3 id="obj-197" class="org-auto-Heading">
-                <span id="obj-198" class="org-auto-Text">Now I have two problems</span>
+        <div id="obj-229" class="org-auto-Section">
+            <h3 id="obj-230" class="org-auto-Heading">
+                <span id="obj-231" class="org-auto-Text">Now I have two problems</span>
             </h3>
-            <p id="obj-199" class="org-auto-Paragraph">
-                <span id="obj-200" class="org-auto-Text">  As I started looking at how I wanted to use this, it became clear that I also wanted to</span>
-                <span id="obj-201" class="org-auto-Text">  support org internal links, which the orignal package did not. The linking to something</span>
-                <span id="obj-202" class="org-auto-Text">  part is simple, but the range of link targets that org supports lead to some complexity</span>
-                <span id="obj-203" class="org-auto-Text">  when thinking about adding it to the package. For example, you can link to a Table and</span>
-                <span id="obj-204" class="org-auto-Text">  almost any other element of an org file but giving it a name using a #NAME+ keyword like so:</span>
+            <p id="obj-232" class="org-auto-Paragraph">
+                <span id="obj-233" class="org-auto-Text">  As I started looking at how I wanted to use this, it became clear that I also wanted to</span>
+                <span id="obj-234" class="org-auto-Text">  support org internal links, which the orignal package did not. The linking to something</span>
+                <span id="obj-235" class="org-auto-Text">  part is simple, but the range of link targets that org supports lead to some complexity</span>
+                <span id="obj-236" class="org-auto-Text">  when thinking about adding it to the package. For example, you can link to a Table and</span>
+                <span id="obj-237" class="org-auto-Text">  almost any other element of an org file but giving it a name using a #NAME+ keyword like so:</span>
             </p>
-            <code id="obj-205" class="org-auto-CodeBlock">
+            <code id="obj-238" class="org-auto-CodeBlock">
 #+NAME: my_table
 | col 1       | col 2           |
 | row 1 col 1 | row 1 col 2     |
@@ -338,21 +374,21 @@ Enable logging at provided level, has no effect if output goes to stdout
 [[my_table][link to my table]]  
             </code>
             <br>
-            <p id="obj-207" class="org-auto-Paragraph">
-                <span id="obj-208" class="org-auto-Text">  Also adding complexity to the needed changes is the fact that a link/reference can</span>
-                <span id="obj-209" class="org-auto-Text">  appear in many places other than plain text. Inside table cells, for example.</span>
+            <p id="obj-240" class="org-auto-Paragraph">
+                <span id="obj-241" class="org-auto-Text">  Also adding complexity to the needed changes is the fact that a link/reference can</span>
+                <span id="obj-242" class="org-auto-Text">  appear in many places other than plain text. Inside table cells, for example.</span>
             </p>
-            <p id="obj-210" class="org-auto-Paragraph">
-                <span id="obj-211" class="org-auto-Text">  The original package's parsing had some other limitations as well, which may well have</span>
-                <span id="obj-212" class="org-auto-Text">  been the author's intention to keep the task at hand to a useful limited subset of org</span>
-                <span id="obj-213" class="org-auto-Text">format. The full format is pretty rich. See</span>
-                <a id="obj-214" class="org-auto-Link" href="https://orgmode.org/worg/org-syntax.html">    <span id="obj-215" class="org-auto-Text">https:</span>    <i id="obj-216" class="org-auto-ItalicText">/orgmode.org</i>    <span id="obj-217" class="org-auto-Text">worg/org-syntax.html</span></a>
+            <p id="obj-243" class="org-auto-Paragraph">
+                <span id="obj-244" class="org-auto-Text">  The original package's parsing had some other limitations as well, which may well have</span>
+                <span id="obj-245" class="org-auto-Text">  been the author's intention to keep the task at hand to a useful limited subset of org</span>
+                <span id="obj-246" class="org-auto-Text">format. The full format is pretty rich. See</span>
+                <a id="obj-247" class="org-auto-Link" href="https://orgmode.org/worg/org-syntax.html">    <span id="obj-248" class="org-auto-Text">https:</span>    <i id="obj-249" class="org-auto-ItalicText">/orgmode.org</i>    <span id="obj-250" class="org-auto-Text">worg/org-syntax.html</span></a>
             </p>
-            <p id="obj-218" class="org-auto-Paragraph">
+            <p id="obj-251" class="org-auto-Paragraph">
                 <br>
-                <span id="obj-220" class="org-auto-Text">  The scale of the modifications needed to achieve my goals convinced me that I was going</span>
-                <span id="obj-221" class="org-auto-Text">  to contort the structure so badly that it would be dificult to maintain. So I decided</span>
-                <span id="obj-222" class="org-auto-Text">  to start over.</span>
+                <span id="obj-253" class="org-auto-Text">  The scale of the modifications needed to achieve my goals convinced me that I was going</span>
+                <span id="obj-254" class="org-auto-Text">  to contort the structure so badly that it would be dificult to maintain. So I decided</span>
+                <span id="obj-255" class="org-auto-Text">  to start over.</span>
                 <br>
             </p>
         </div>
