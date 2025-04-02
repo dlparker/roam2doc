@@ -72,7 +72,7 @@ or
 #+END_SRC
    3. To see the result of parsing a large number of org content types:
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help examples/plain/all_nodes.org -o all.html --overwrite    
+   PYTHONPATH=./src src/roam2doc --help examples/conversion/all_nodes/all_nodes.org -o all.html --overwrite    
 #+END_SRC
    3. To see the result of parsing this file:
 #+BEGIN_SRC bash
