@@ -8,7 +8,7 @@
    for differences in how document structures work in the two formats.
 - Optionally converts the html to pdf using wkhtml2pdf or letex to PDF using pdflatex.
 - Focused on the document creation aspect of org and org-roam, not on the todo lists, schedules, etc.
-- Supports custom block surrounded with keywords ~#+BEGIN_FILE_INCLUDE~ and ~#+BEGIN_FILE_INCLUDE~
+- Supports custom block surrounded with keywords ~#+BEGIN_FILE_INCLUDE~ and ~#+END_FILE_INCLUDE~
   where each line in the block is treated as a file include spec. The first word in the line is
   treated as a file path and any remainging words on the line are treated
   as a line of content that should be prepended to the file's content during inclusion. The path
@@ -21,7 +21,7 @@
   this feature would need an upgrade if you want to use it with file names that contain spaces.
   You can see this feature in operation when
   [[file:examples/conversion/all_nodes/all_nodes.org][examples/conversion/all_nodes/all_nodes.org]] includes a couple
-  of files in a block that looks like this:
+  of files in a block that looks like this (github .org file processing eats the #+BE... without the escape):
 #+BEGIN_SRC
 \#+BEGIN_FILE_INCLUDE 
 includer1.org ** Section heading for include file, specified in include line
@@ -40,7 +40,7 @@ includer2.org
 
 * HOW to use it
 1. Until this becomes and actual package that includes an exectuable:
-   1. PYTHONPATH=./src src/roam2doc --help
+   1. PYTHONPATH=./src src/roam2doc/cli.py --help
 2. There are two options for producing PDF, both of which require external tools
    1. The preferred method is to use the latex to pdf tool
       "pdflatex". This is the preferred way because it generates a decent
@@ -50,33 +50,43 @@ includer2.org
       1. sudo apt update
       2. sudo apt install texlive-full textlive-latex-extra
    2. Alternatively you can generate a pdf from html using wkhtmltopdf. It
-      currently does not produce and index or the cross reference for AIs,
-      but it does look nicer, at least to me. I may eventually add an index
-      (if wkhtmltopdf supports it) and the AI cross reference (that is just work)
+      currently does not produce an index or the cross reference for AIs,
+      but it does look nicer, at least to me, so maybe it is better
+      for humman viewing. I may eventually add an index
+      (if I can get wkhtmltopdf to generate it) and the AI cross
+      reference (that is just work).
+      I can't figure out how to build an index manually because the page
+      breaks are created by wkhtmltopdf, and it is a fool's errand to try
+      to put page breaks in the html. The only way to do that is with
+      css, and even if you got it to work it would be broken any time
+      there was an element in a page that messed up your idea of paging.
+      Images are an example of that possibility. Or, what if the table
+      of contents wkhtmltopdf creates takes up more paged than you expect?
+      The whole idea is a freakin nightmare.
 3. If you want to use wkhtmltopdf, then you
-   will want to ensure that you have the patched QT version of wkhtml2pdf. The
+   will want to ensure that you have the patched QT version of wkhtmltopdf. The
    unpatched version will not handle links properly, nor produce a table of contents.
 4. See some examples in action
    1. To see the result of combining roam files:
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
+   PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.html --overwrite --doc_type=html
 or
-   PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
+   PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.latex --overwrite --doc_type=latex
 or 
-   PYTHONPATH=./src src/roam2doc --help examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
+   PYTHONPATH=./src src/roam2doc/cli.py examples/roam/roam1/roam_combine1.list -o roam1.pdf --overwrite --doc_type=pdf --grokify
  
 #+END_SRC
    2. To see how the include mechansim works
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
+   PYTHONPATH=./src src/roam2doc/cli.py  examples/roam/roam2/roam_combine2.list -o roam2.pdf --overwrite --doc_type=pdf --grokify
 #+END_SRC
    3. To see the result of parsing a large number of org content types:
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help examples/conversion/all_nodes/all_nodes.org -o all.html --overwrite    
+   PYTHONPATH=./src src/roam2doc/cli.py examples/conversion/all_nodes/all_nodes.org -o all.html --overwrite 
 #+END_SRC
    3. To see the result of parsing this file:
 #+BEGIN_SRC bash
-   PYTHONPATH=./src src/roam2doc --help README.org -o readme.html --overwrite    
+   PYTHONPATH=./src src/roam2doc/cli.py README.org -o readme.html --overwrite    
 #+END_SRC
 The full help:
 #+BEGIN_SRC bash
@@ -115,12 +125,14 @@ options:
   heaading are parsed, all other drawers are not parsed, just treated as text.
 - Verbatim strings cannot contain equal sign "=", use ~ (inline code) if you need that in your text.
 ** Things it doesn't do and maybe never will
-- Parse and do something useful with the time management aspects of org files, this
-- Inlinetasks are not parsed, they will be treated as headings an will make things ugly
+- Parse and do something useful with the time management aspects of org files.
+- Inlinetasks are not parsed, they will be treated as headings and will make things ugly
 ** Things it doesn't do and probably won't
-- Run wkhtml2pdf on windows. Works on linux, will probably work on Mac
-- Produce LaTex output, including any LaTex features found in the org files
+- Run wkhtml2pdf or pdflatex on windows. Works on linux, will probably work on Mac. You can
+  product the html or latex output on Windows (probably, I haven't tried but it is pure python using only
+  standard libraries. I may have gotten sloppy with file paths somewhere, but maybe not).
 ** Things that might be nice to add someday
+- Produce output including any LaTex features found in the org files
 - Provide option to allow uset to supply css and or javascript contents to
   be merged into the head of the html output. There is already an option
   to include a json object version of the parsed tree into the head, so
