@@ -23,10 +23,10 @@
   [[file:examples/comversion/all_nodes/all_nodes.org][examples/conversion/all_nodes/all_nodes.org]] includes a couple
   of files in a block that looks like this:
 #+BEGIN_SRC
-#+BEGIN_FILE_INCLUDE 
+\#+BEGIN_FILE_INCLUDE 
 includer1.org ** Section heading for include file, specified in include line
 includer2.org
-#+END_FILE_INCLUDE
+\#+END_FILE_INCLUDE
 #+END_SRC
   
 - On request, it generates a PDF that has special markup in the text and a cross reference at the end
