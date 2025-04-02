@@ -20,7 +20,7 @@
   in building a file that is essentially just and outline for including other files. Note that
   this feature would need an upgrade if you want to use it with file names that contain spaces.
   You can see this feature in operation when
-  [[file:examples/comversion/all_nodes/all_nodes.org][examples/conversion/all_nodes/all_nodes.org]] includes a couple
+  [[file:examples/conversion/all_nodes/all_nodes.org][examples/conversion/all_nodes/all_nodes.org]] includes a couple
   of files in a block that looks like this:
 #+BEGIN_SRC
 \#+BEGIN_FILE_INCLUDE 
