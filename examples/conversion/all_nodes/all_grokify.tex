@@ -84,7 +84,7 @@ The following next two blank will also be part of the paragraph.
 They should be part of the section directly.
 
 a link
-\hyperref[obj-164]{link to last line of the definition list later in the page (xref:63)}
+\hyperref[obj-161]{link to last line of the definition list later in the page (xref:63)}
 
 \vspace{\baselineskip}
 This will be a third paragraph and will have no extra blank lines before the next section.
@@ -166,10 +166,6 @@ unordered sub 1
 \begin{itemize}
 \item
 unordered sub 1 subsub 1
-\begin{enumerate}
-\item
-THIS GETS PLACED IN WRONG PARENT!!!!!!
-\end{enumerate}
 \end{itemize}
 \item
 unordered sub 2
@@ -182,10 +178,10 @@ unordered second
 see a pattern?
 \item[beebop]
 arubop
-\label{obj-164} (xref-id:164)
+\label{obj-161} (xref-id:161)
   Some text as a paragraph in an item!!! (this is child of unordered secont)
 and a link
-\hyperref[obj-15]{\textbf{\emph{back to the top!}} (xref:168)}
+\hyperref[obj-15]{\textbf{\emph{back to the top!}} (xref:165)}
   and an embedded table!!
 
 \begin{tabular}{|c|c|}
@@ -200,6 +196,10 @@ unordered third
 \begin{enumerate}
 \item
 ordered first, child of unordered third
+\begin{enumerate}
+\item
+THIS GETS PLACED IN WRONG PARENT!!!!!!
+\end{enumerate}
 \item
 ???
 \end{enumerate}
@@ -421,11 +421,11 @@ export blocks make little sense after conversion
 \hline
 \hyperref[obj-50]{50} & 390  \\
 \hyperref[obj-75]{75} & 396  \\
-\hyperref[obj-164]{164} & 63  \\
+\hyperref[obj-161]{161} & 63  \\
 \hyperref[obj-384]{384} & 101  \\
 \hyperref[obj-385]{385} & 52,97  \\
 \hyperref[obj-381]{381} & 105  \\
-\hyperref[obj-15]{15} & 168,402  \\
+\hyperref[obj-15]{15} & 165,402  \\
 \hyperref[obj-42]{42} & 293  \\
 \hline
 \end{tabular}

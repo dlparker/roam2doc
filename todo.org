@@ -1,6 +1,6 @@
 * BUGZ
 1. Problems converting all_nodes.org
-   1. the last part of the type changing list in all_nodes.org has a line that ends up under the wrong parent
+   1. [X} the last part of the type changing list in all_nodes.org has a line that ends up under the wrong parent
    2. [X] In the links table at the end, in latexpdf, link to list 1 doesn't link
    3. [X] In the links table at the end, in latexpdf, display of broken link is broken
    4. [X} In latexpdf, images don't work. This is an okular problem, shows up in browser

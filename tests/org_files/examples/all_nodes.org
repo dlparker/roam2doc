@@ -74,7 +74,7 @@ This will be a third paragraph and will have no extra blank lines before the nex
     | yy | /this item is italian/ |
 - unordered third
   1. ordered first, child of unordered third
-     1. THIS GETS PLACED IN WRONG PARENT!!!!!!
+     1. This uncovered a bug, because this line is prepended with 5 spaces when it should be 4
   2. ???
      
 

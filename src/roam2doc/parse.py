@@ -605,15 +605,14 @@ class ListParse(ParseTool):
         # Now fix the levels
         for line_index,record in match_records.items():
             if self.spaces_per_level is not None and record['lindent'] > self.margin:
-                strict = int((record['lindent'] - self.margin) / self.spaces_per_level) 
+                strict = int((record['lindent'] - self.margin) / self.spaces_per_level)
                 record['level'] = strict  + 1
                 if strict * self.spaces_per_level < record['lindent'] - self.margin:
-                    # we are going to allow improper indent, if it is greater, grant
-                    # level increase
-                    record['level'] = strict + 2
+                    self.logger.warn("improper formatting of list at line %d of %d, moving up to previous level",
+                                     record['line_index'], len(self.doc_parser.lines))
             else:
                 record['level'] = 1
-        
+                             
         # Now that we know everyone's indent level, we can latch the child matches onto the
         # parents so there is no confusion about which item each attaches to
         match_order = list(match_records.keys())
@@ -630,7 +629,14 @@ class ListParse(ParseTool):
             if level == 1:
                 top_level_records.append(rec)
             else:
-                parent_rec = level_lasts[level-1]
+                # Be definsive, someone might have skipped a level
+                # if the file is bogus. It is to fuzzy a problem
+                # to fix, so just shift it left until there is
+                # something there
+                t_level = level-1
+                while t_level > 0 and t_level not in level_lasts:
+                    t_level -= 1
+                parent_rec = level_lasts[t_level]
                 if 'children' not in parent_rec:
                     parent_rec['children'] = []
                 if rec not in parent_rec['children']:
