@@ -49,7 +49,7 @@ def set_levels(handler_names, additions=None, default_level='error'): # pragma: 
     debug_log = dict(handlers=handler_names, level="DEBUG", propagate=False)
     log_loggers[''] = root_log
     default_log = err_log
-    if default_level == "warn":
+    if default_level == "warn" or  default_level == "warning":
         default_log =  warn_log
     elif default_level == "info":
         default_log =  info_log
@@ -57,6 +57,7 @@ def set_levels(handler_names, additions=None, default_level='error'): # pragma: 
         default_log =  debug_log
     log_loggers['roam2doc.parser'] = default_log
     log_loggers['roam2doc.tree'] = default_log
+    log_loggers['roam2doc.io'] = default_log
     log_loggers['test_code'] = default_log
     if additions:
         for add in additions:

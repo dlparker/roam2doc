@@ -24,11 +24,15 @@
   of files in a block that looks like this (github .org file processing eats the #+BE... without the escape):
 #+BEGIN_SRC
 \#+BEGIN_FILE_INCLUDE 
-includer1.org ** Section heading for include file, specified in include line
+includer1.org * Section heading for include file, specified in include line
 includer2.org
 \#+END_FILE_INCLUDE
 #+END_SRC
-  
+  Note that the heading for a file, if specified, will cause the headings inside the file to be adjusted
+  in level. So if the include heading is "* Include" and the file contains a heading "* Section 1", it will
+  be transformed to "** Section 1". The idea here is that the included files shouldn't have to know about
+  the file that includes them, and yet the file that does the including shouldn't have its structure messed
+  up by an inappropriate heading level in the included file.
 - On request, it generates a PDF (only latex based option) that has special markup in the text and a cross reference at the end
   of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
   internal links in the file after it has passed through OCR. This is particularly important if you

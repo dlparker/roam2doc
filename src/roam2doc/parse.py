@@ -18,10 +18,11 @@ from roam2doc.tree import (Root, Branch, Section, Heading, Text, Paragraph, Blan
 
 class DocParser:
 
-    def __init__(self, text, source, root=None):
+    def __init__(self, text, source, root=None, included_files=None):
         self.text = text
         self.lines = text.split('\n')
         self.source = str(source)
+        self.included_files = included_files
         if root is None:
             root = Root(self.source)
             self.branch = Branch(root, self.source, self)
@@ -87,6 +88,9 @@ class DocParser:
         heading_text = None
         # if the first line is not a heading, then we don't have one,
         # we have a zeroth section with no heading
+        # however, it the zeroth section is nothing but properties,
+        # followed by a heading, then we will treat that heading
+        # as starting the first section
         tool_box = ToolBox(self)
         heading_matcher = tool_box.get_matcher(MatcherType.heading)
         elem = heading_matcher.match_line(self.lines[pos])
@@ -112,6 +116,9 @@ class DocParser:
             self.doc_properties = properties
             # props wrapped in :PROPERTIES:\nprops\n:END:
             start_offset += len(properties) + 2
+            # while we are at it, just skip any blank lines
+            while self.lines[start_offset].strip() == '':
+                start_offset += 1
             self.logger.info("Found file level properies, setting offset to %s", start_offset)
             self.logger.debug("File level properies = %s", pformat(properties))
         # might have a #+title: next

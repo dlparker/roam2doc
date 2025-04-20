@@ -2,8 +2,11 @@ import sys
 import logging
 from pathlib import Path
 from glob import glob
+import re
 from roam2doc.parse import DocParser
-logger = logging.getLogger('roam2doc-io')
+logger = logging.getLogger('roam2doc.io')
+
+heading_pattern = re.compile(r'^(?P<stars>\*+)[ \t]*(?P<heading>.*)?')
 
 
 class FilesToParsers:
@@ -57,38 +60,56 @@ class FilesToParsers:
                     raise ValueError(f"File {path} tried to include non-existant file {check_path}")
                 include_paths.append(check_path)
                 self.skip_files.append(check_path)
+                logger.warn("including %s", str(check_path))
+                level = None
                 if check_spec['first_line']:
                     new_lines.append(check_spec['first_line'])
+                    res = heading_pattern.match(check_spec['first_line'])
+                    if res:
+                        level = len(res.groupdict()['stars'])
                 with open(check_path, "r", encoding="utf-8") as f:
                     include_contents = f.read()
-                new_lines.extend(include_contents.split('\n'))
+                if level:
+                    extra = "*" * level
+                    for line in include_contents.split('\n'):
+                        if line.startswith('*'):
+                            new_lines.append(f'{extra}{line}')
+                        else:
+                            new_lines.append(line)
+                else:
+                    new_lines.extend(include_contents.split('\n'))
             contents = '\n'.join(new_lines)
         count = len(include_paths)
         if count:
             # do it again
-            new_lines = self.do_file_includes(new_lines, path)
-            return new_lines
+            new_lines, sub_files = self.do_file_includes(new_lines, path)
+            if sub_files:
+                include_paths.extend(sub_files)
+            return new_lines, include_paths
         else:
-            return content_lines
+            return content_lines, None
         
     def run_parsers(self):
         root_parser = None
         parsers = []
         contents_by_path = {}
+        includes_by_path = {}
         for path in self.file_list:
             if path in self.skip_files:
                 continue
             with open(path, "r", encoding="utf-8") as f:
                 contents = f.read()
-            with_includes = self.do_file_includes(contents.split('\n'), path)
+            with_includes,included = self.do_file_includes(contents.split('\n'), path)
             contents_by_path[path] = '\n'.join(with_includes)
+            includes_by_path[path] = included
         for path in self.file_list:
             if path not in self.skip_files:
                 contents = contents_by_path[path]
                 if root_parser is None:
-                    root_parser = parser = DocParser(contents, str(path))
+                    root_parser = parser = DocParser(contents, str(path), included_files=includes_by_path[path])
                 else:
-                    parser = DocParser(contents, str(path), root=root_parser.root)
+                    parser = DocParser(contents, str(path), root=root_parser.root,
+                                       included_files=includes_by_path[path])
                 parsers.append(parser)
                 parser.parse()
         return parsers

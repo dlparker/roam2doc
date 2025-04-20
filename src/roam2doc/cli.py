@@ -163,6 +163,9 @@ def process_input(args):
     elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict(), indent=2)
     if output_path:
+        y = list(output_path.parts)[:-1]
+        y.append(output_path.stem)
+        stem_path = Path(*y)
         if args.wk_pdf:
             tmp_path = Path(str(output_path) + ".html")
             with open(tmp_path, 'w', encoding="utf-8") as f:
@@ -171,9 +174,6 @@ def process_input(args):
             tmp_path.unlink()
             return parsers
         elif args.doc_type == "pdf":
-            y = list(output_path.parts)[:-1]
-            y.append(output_path.stem)
-            stem_path = Path(*y)
             tex_path = str(stem_path) + ".tex"
             with open(tex_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)
@@ -183,6 +183,16 @@ def process_input(args):
                 f.write(output_text)
         else:
             raise Exception(f"don't know how to do file on doc_type {args.doc_type}")
+
+        included_files = []
+        for parser in parsers:
+            if parser.included_files:
+                included_files.extend(parsers[0].included_files)
+        if included_files:
+            inc_path = str(stem_path) + ".included"
+            with open(inc_path, 'w', encoding="utf-8") as f:
+                for p in included_files:
+                    f.write(str(p) + "\n")
         logger.info(f"{args.doc_type.upper()} written to {output_path}")
     elif args.doc_type in ['html', 'json', 'latex']:
         print(output_text)
