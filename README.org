@@ -52,7 +52,7 @@ includer2.org
       (using the -grokify switch). The generated latex output uses various latex
       packages, all of which are available on ubuntu like this:
       1. sudo apt update
-      2. sudo apt install texlive-full textlive-latex-extra
+      2. sudo apt install texlive-full texlive-latex-extra
    2. Alternatively you can generate a pdf from html using wkhtmltopdf. It
       currently does not produce an index or the cross reference for AIs,
       but it does look nicer, at least to me, so maybe it is better
