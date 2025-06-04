@@ -33,6 +33,11 @@ includer2.org
   be transformed to "** Section 1". The idea here is that the included files shouldn't have to know about
   the file that includes them, and yet the file that does the including shouldn't have its structure messed
   up by an inappropriate heading level in the included file.
+  *NOTE:* if you omit the include heading, org-roam links created in the usual way will not work. This is
+  because these links target the ID field of the property drawer of the "zeroth" section. Since the include
+  directive combines files and then processes them, the property drawers of included files are no longer in
+  the zeroths section. If you use an include heading, then the property drawer ends up being attached to that
+  heading, and it all works. So, TLDR, it is better to use the include heading rather than omit it.
 - On request, it generates a PDF (only latex based option) that has special markup in the text and a cross reference at the end
   of the generated document that is designed to enable an AI (tested with Grok3) to figure out the
   internal links in the file after it has passed through OCR. This is particularly important if you

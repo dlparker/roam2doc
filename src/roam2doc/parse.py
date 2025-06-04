@@ -187,6 +187,7 @@ class DocParser:
                 if self.doc_properties is not None:
                     if "ID" in self.doc_properties:
                         raw = self.doc_properties['ID']
+                        self.logger.debug("adding link targeet for doc properties id %s", raw.lstrip())
                         self.root.add_link_target(section.tree_node, raw.lstrip())
             self.pop_parser(section)
             index += 1

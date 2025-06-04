@@ -79,6 +79,9 @@ class FilesToParsers:
                         else:
                             new_lines.append(line)
                 else:
+                    # Without a level spec on the include, the doc properties
+                    # will get ignored. With the level spec the property
+                    # drawer looks like it belongs to the heading.
                     new_lines.extend(include_contents.split('\n'))
             contents = '\n'.join(new_lines)
         count = len(include_paths)
