@@ -153,7 +153,7 @@ def process_input(args):
     root = parsers[0].root
 
     # Handle output
-    if args.doc_type == "html" or args.wk_pdf:
+    if args.doc_type == "html" or (hasattr(args, 'wk_pdf') and args.wk_pdf):
         output_text = root.to_html(include_json=args.include_json)
     elif args.doc_type == "json":
         output_text = json.dumps(root.to_json_dict())
@@ -166,7 +166,7 @@ def process_input(args):
         y = list(output_path.parts)[:-1]
         y.append(output_path.stem)
         stem_path = Path(*y)
-        if args.wk_pdf:
+        if hasattr(args, 'wk_pdf') and args.wk_pdf:
             tmp_path = Path(str(output_path) + ".html")
             with open(tmp_path, 'w', encoding="utf-8") as f:
                 f.write(output_text)

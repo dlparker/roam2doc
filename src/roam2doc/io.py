@@ -20,6 +20,7 @@ class FilesToParsers:
 
     def do_file_includes(self, content_lines, path):
         include_paths = []
+        bad_include_paths = []
         skip_counter = 0
         new_lines = []
         for pos, line in enumerate(content_lines):
@@ -57,7 +58,8 @@ class FilesToParsers:
                     dirname = path.parent
                     check_path = Path(dirname, check_path)
                 if not check_path.exists():
-                    raise ValueError(f"File {path} tried to include non-existant file {check_path}")
+                    bad_include_paths.append(check_path)
+                    continue
                 include_paths.append(check_path)
                 self.skip_files.append(check_path)
                 logger.warn("including %s", str(check_path))
@@ -82,26 +84,31 @@ class FilesToParsers:
         count = len(include_paths)
         if count:
             # do it again
-            new_lines, sub_files = self.do_file_includes(new_lines, path)
+            new_lines, sub_files,sub_bads = self.do_file_includes(new_lines, path)
             if sub_files:
                 include_paths.extend(sub_files)
-            return new_lines, include_paths
+            if sub_bads:
+                bad_include_paths.extend(sub_bads)
+            return new_lines, include_paths, bad_include_paths
         else:
-            return content_lines, None
+            return content_lines, None, None
         
     def run_parsers(self):
         root_parser = None
         parsers = []
         contents_by_path = {}
         includes_by_path = {}
+        bad_paths_by_path = {}
         for path in self.file_list:
             if path in self.skip_files:
                 continue
             with open(path, "r", encoding="utf-8") as f:
                 contents = f.read()
-            with_includes,included = self.do_file_includes(contents.split('\n'), path)
+            with_includes,included,bad_paths = self.do_file_includes(contents.split('\n'), path)
             contents_by_path[path] = '\n'.join(with_includes)
             includes_by_path[path] = included
+            if bad_paths:
+                bad_paths_by_path[path] = bad_includes
         for path in self.file_list:
             if path not in self.skip_files:
                 contents = contents_by_path[path]
@@ -112,6 +119,13 @@ class FilesToParsers:
                                        included_files=includes_by_path[path])
                 parsers.append(parser)
                 parser.parse()
+        if len(bad_paths_by_path) > 0:
+            with open('bad_includes.list', 'w') as f:
+                for path,bads in bad_paths_by_path.items():
+                    f.write(f"included_from {path}\n")
+                    for bad in bads:
+                        f.write(f"{bad}\n")
+                    f.write(f"\n")
         return parsers
 
 def parse_fileset(filepaths):

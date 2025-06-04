@@ -368,6 +368,7 @@ class TableParse(ParseTool):
                     cell = TableCell(tr, pos, pos)
                     content_list = tool_box.get_text_and_object_nodes_in_line(self.tree_node,
                                                                               item, pos)
+                    self.logger.debug("cell %s", item)
                     for citem in content_list:
                         citem.move_to_parent(cell)
                 pos += 1
