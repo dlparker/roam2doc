@@ -116,9 +116,9 @@ class FilesToParsers:
             if path not in self.skip_files:
                 contents = contents_by_path[path]
                 if root_parser is None:
-                    root_parser = parser = DocParser(contents, str(path), included_files=includes_by_path[path])
+                    root_parser = parser = DocParser(contents, str(path.parts[-1]), included_files=includes_by_path[path])
                 else:
-                    parser = DocParser(contents, str(path), root=root_parser.root,
+                    parser = DocParser(contents, str(path.parts[-1]), root=root_parser.root,
                                        included_files=includes_by_path[path])
                 parsers.append(parser)
                 parser.parse()

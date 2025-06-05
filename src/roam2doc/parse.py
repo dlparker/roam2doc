@@ -187,7 +187,7 @@ class DocParser:
                 if self.doc_properties is not None:
                     if "ID" in self.doc_properties:
                         raw = self.doc_properties['ID']
-                        self.logger.debug("adding link targeet for doc properties id %s", raw.lstrip())
+                        self.logger.debug("adding link target for doc properties id %s", raw.lstrip())
                         self.root.add_link_target(section.tree_node, raw.lstrip())
             self.pop_parser(section)
             index += 1
@@ -323,7 +323,7 @@ class SectionParse(ParseTool):
             self.logger.debug("%s has properties %s", short_id, pformat(self.properties))
             pos += len(self.properties) + 2
             if "ID" in self.properties:
-                self.doc_parser.root.add_link_target(self.tree_node, self.properties['ID'])
+                self.doc_parser.root.add_link_target(heading, self.properties['ID'])
         # now find all greater elements
         last_sub_start = pos - 1
         last_sub_end = pos - 1

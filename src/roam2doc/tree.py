@@ -43,7 +43,6 @@ class Root:
         self.link_targets[target_id] = new_target
         return {'link_target': new_target, 'node': new_target.target_node}
 
-        
     def find_heading_match(self, text, level=None):
         if not level:
             level = self.trunk
